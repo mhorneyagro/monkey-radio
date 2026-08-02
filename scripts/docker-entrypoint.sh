@@ -42,10 +42,18 @@ start_pulseaudio() {
   fi
 
   mkdir -p /tmp/pulse
-  pulseaudio --daemonize --exit-idle-time=-1 --disallow-exit \
-    --log-target=stderr --file=/tmp/pulse/native
+  local pa_args=(--daemonize --exit-idle-time=-1 --disallow-exit --log-target=stderr --file=/tmp/pulse/native)
+  if [ "$(id -u)" -eq 0 ]; then
+    pa_args=(--system "${pa_args[@]}")
+  fi
+  pulseaudio "${pa_args[@]}"
 
   sleep 1
+  export PULSE_SERVER="${PULSE_SERVER:-unix:/tmp/pulse/native}"
+  pactl info >/dev/null 2>&1 || {
+    echo "[entrypoint] PulseAudio failed to start"
+    return 1
+  }
   pactl load-module module-null-sink sink_name=stream_sink sink_properties=device.description=StreamSink
   pactl set-default-sink stream_sink
   echo "[entrypoint] PulseAudio ready (stream_sink)"
@@ -64,7 +72,7 @@ start_xvfb() {
 }
 
 wait_for_dashboard() {
-  local url="${DASHBOARD_URL:-http://localhost:5400}"
+  local url="${DASHBOARD_URL:-http://localhost:${PORT:-5400}}"
   local attempts=0
   until curl -sf "${url}/health" >/dev/null; do
     attempts=$((attempts + 1))
