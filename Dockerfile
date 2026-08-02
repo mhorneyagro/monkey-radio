@@ -8,6 +8,7 @@ ENV NODE_ENV=development
 ENV NPM_CONFIG_PRODUCTION=false
 ENV NPM_CONFIG_OMIT_DEV=false
 ENV CI=true
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 # better-sqlite3 native compile
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
@@ -16,11 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
 COPY package.json package-lock.json tsconfig.base.json tsconfig.build.json ./
 COPY packages ./packages
 
-# Skip lifecycle scripts (library-worker playwright download); build explicitly below
-RUN npm ci --include=dev --ignore-scripts \
+# Install deps (skip Playwright browser download; Chromium installed in runtime stage)
+RUN npm ci --include=dev \
  && mkdir -p node_modules/@monkey-radio \
  && ln -sfn ../../packages/shared node_modules/@monkey-radio/shared \
  && test -f node_modules/.bin/tsc \
+ && test -f node_modules/better-sqlite3/build/Release/better_sqlite3.node \
  && test -f node_modules/@monkey-radio/shared/package.json
 
 RUN npm run build -w @monkey-radio/shared \
