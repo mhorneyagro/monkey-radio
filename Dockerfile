@@ -3,15 +3,22 @@ FROM node:20-bookworm AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json tsconfig.base.json ./
+# Render injects NODE_ENV=production — override so devDependencies (typescript) install
+ENV NODE_ENV=development
+ENV NPM_CONFIG_PRODUCTION=false
+ENV CI=true
+
+# better-sqlite3 native compile
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json tsconfig.base.json tsconfig.build.json ./
 COPY packages ./packages
 
-RUN npm ci
+# Skip lifecycle scripts (library-worker playwright download); build explicitly below
+RUN npm ci --include=dev --ignore-scripts
 
-RUN npm run build -w @monkey-radio/shared \
- && npm run build -w broadcast-worker \
- && npm run build -w @monkey-radio/dashboard \
- && npm run build -w stream-worker
+RUN npx tsc -b tsconfig.build.json
 
 # Runtime image with ffmpeg, Xvfb, PulseAudio, Playwright Chromium
 FROM node:20-bookworm
@@ -39,8 +46,7 @@ COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/packages/broadcast-worker ./packages/broadcast-worker
 COPY --from=builder /app/packages/dashboard ./packages/dashboard
 COPY --from=builder /app/packages/stream-worker ./packages/stream-worker
-COPY package.json package-lock.json ./
-COPY tsconfig.base.json ./
+COPY package.json package-lock.json tsconfig.base.json tsconfig.build.json ./
 COPY assets ./assets
 COPY logo-*.png ./
 COPY scripts ./scripts

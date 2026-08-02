@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/broadcast-worker" },
+    { "path": "./packages/dashboard" },
+    { "path": "./packages/stream-worker" }
+  ]
+}
