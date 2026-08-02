@@ -24,6 +24,7 @@ const CHROMIUM_ARGS = [
   "--disable-infobars",
   "--disable-session-crashed-bubble",
   "--force-device-scale-factor=1",
+  "--disable-gpu",
 ];
 
 function sleep(ms: number): Promise<void> {
@@ -141,8 +142,7 @@ async function launchBrowser(
   const context = await chromium.launchPersistentContext("/tmp/chromium-stream", {
     headless: false,
     args: [...CHROMIUM_ARGS, `--app=${canvasUrl}`],
-    viewport: null,
-    deviceScaleFactor: 1,
+    viewport: { width: 1920, height: 1080 },
     ignoreDefaultArgs: ["--enable-automation"],
     env: {
       ...process.env,
