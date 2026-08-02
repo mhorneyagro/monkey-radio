@@ -79,6 +79,7 @@ export function createPlayback({ trackAudio, djAudio }) {
     document.head.appendChild(link);
 
     const probe = new Audio();
+    probe.crossOrigin = "anonymous";
     probe.preload = "auto";
     probe.src = absolute;
 
@@ -118,6 +119,7 @@ export function createPlayback({ trackAudio, djAudio }) {
   async function loadTrack(url, key) {
     const absolute = absoluteUrl(url);
     if (loadedTrackKey !== key) {
+      trackAudio.crossOrigin = "anonymous";
       trackAudio.src = url;
       loadedTrackKey = key;
       await trackAudio.load();
@@ -128,6 +130,7 @@ export function createPlayback({ trackAudio, djAudio }) {
   async function loadDj(url, key) {
     const absolute = absoluteUrl(url);
     if (loadedDjKey !== key) {
+      djAudio.crossOrigin = "anonymous";
       djAudio.src = url;
       loadedDjKey = key;
       await djAudio.load();

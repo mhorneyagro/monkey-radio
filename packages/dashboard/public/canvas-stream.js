@@ -53,7 +53,7 @@ async function syncPlayback() {
 }
 
 async function refreshNowPlaying() {
-  const response = await fetch("/api/broadcast/now-playing");
+  const response = await fetch("/api/broadcast/now-playing?audioOrigin=local");
   const data = await response.json();
 
   updateNowPlayingStrip(nowPlayingStrip, data);
@@ -62,11 +62,25 @@ async function refreshNowPlaying() {
   if (!data.playing) return;
 
   const result = await playback.applyNowPlaying(data);
+  unmuteAudioElements();
+  await playback.resume();
+
+  const primary = playback.getPrimaryAudio();
+  if (primary.paused && !primary.ended) {
+    try {
+      await primary.play();
+    } catch (error) {
+      console.warn("[stream] play failed", error);
+    }
+  }
+
   if (!window.__STREAM_READY__) {
     const played = await syncPlayback();
     if (!played && !result.needsUserGesture) {
       await syncPlayback();
     }
+  } else if (playback.isPlaying()) {
+    window.__STREAM_READY__ = true;
   }
 }
 

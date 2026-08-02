@@ -214,7 +214,7 @@ const streamWorkerConfigSchema = z.object({
   frameRate: z.coerce.number().int().positive().default(30),
   videoBitrate: z.string().default("4500k"),
   audioBitrate: z.string().default("192k"),
-  videoPreset: z.string().default("veryfast"),
+  videoPreset: z.string().default("faster"),
 });
 
 export type StreamWorkerConfig = z.infer<typeof streamWorkerConfigSchema>;

@@ -2,10 +2,12 @@ import { config } from "dotenv";
 import { randomUUID } from "node:crypto";
 import express from "express";
 import { createReadStream, existsSync, statSync } from "node:fs";
+import { Readable } from "node:stream";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   checkLibraryHealth,
+  cdnObjectUrl,
   getBroadcastPlayback,
   getRecentDjSegments,
   getRecentPlaybackWithTracks,
@@ -358,10 +360,45 @@ function serveAudioFile(
   createReadStream(absolutePath, { start, end }).pipe(res);
 }
 
-app.get("/api/broadcast/now-playing", (_req, res) => {
+async function proxyCdnAudio(
+  req: express.Request,
+  res: express.Response,
+  cdnUrl: string,
+): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (typeof req.headers.range === "string") {
+    headers.Range = req.headers.range;
+  }
+
+  const upstream = await fetch(cdnUrl, { headers });
+  res.status(upstream.status);
+
+  const contentType = upstream.headers.get("content-type");
+  if (contentType) res.setHeader("Content-Type", contentType);
+  res.setHeader("Accept-Ranges", "bytes");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+
+  const contentLength = upstream.headers.get("content-length");
+  if (contentLength) res.setHeader("Content-Length", contentLength);
+
+  const contentRange = upstream.headers.get("content-range");
+  if (contentRange) res.setHeader("Content-Range", contentRange);
+
+  if (!upstream.body) {
+    res.end();
+    return;
+  }
+
+  Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream).pipe(
+    res,
+  );
+}
+
+app.get("/api/broadcast/now-playing", (req, res) => {
+  const preferLocal = req.query.audioOrigin === "local";
   res.json(
     buildNowPlayingResponse(db, broadcastConfig, {
-      libraryCdnUrl: libraryConfig.libraryCdnUrl,
+      libraryCdnUrl: preferLocal ? undefined : libraryConfig.libraryCdnUrl,
     }),
   );
 });
@@ -471,7 +508,7 @@ app.get("/api/audio/dj/:segmentId", (req, res) => {
   serveAudioFile(req, res, absolutePath);
 });
 
-app.get("/api/audio/:trackId", (req, res) => {
+app.get("/api/audio/:trackId", async (req, res) => {
   const track = getTrackById(db, req.params.trackId);
   if (!track?.file_path) {
     res.status(404).json({ error: "Track not found" });
@@ -483,12 +520,25 @@ app.get("/api/audio/:trackId", (req, res) => {
     track.file_path,
   );
 
-  if (!existsSync(absolutePath)) {
-    res.status(404).json({ error: "Audio file missing on disk" });
+  if (existsSync(absolutePath)) {
+    serveAudioFile(req, res, absolutePath);
     return;
   }
 
-  serveAudioFile(req, res, absolutePath);
+  if (libraryConfig.libraryCdnUrl) {
+    const cdnUrl = cdnObjectUrl(libraryConfig.libraryCdnUrl, track.file_path);
+    try {
+      await proxyCdnAudio(req, res, cdnUrl);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[audio] CDN proxy failed for ${track.id}: ${message}`);
+      res.status(502).json({ error: "CDN audio unavailable" });
+      return;
+    }
+  }
+
+  res.status(404).json({ error: "Audio file missing on disk" });
 });
 
 app.listen(port, () => {

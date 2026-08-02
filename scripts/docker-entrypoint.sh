@@ -62,6 +62,8 @@ start_pulseaudio() {
   gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
     pactl load-module module-null-sink sink_name=stream_sink sink_properties=device.description=StreamSink
   gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
+    pactl set-sink-latency stream_sink 50000
+  gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
     pactl set-default-sink stream_sink
 
   echo "[entrypoint] PulseAudio ready (stream_sink at $PULSE_SERVER)"
