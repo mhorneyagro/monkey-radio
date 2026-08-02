@@ -39,6 +39,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     xvfb \
     pulseaudio \
+    pulseaudio-utils \
+    gosu \
     curl \
     libnss3 \
     libatk-bridge2.0-0 \
@@ -63,11 +65,16 @@ COPY assets ./assets
 COPY logo-*.png ./
 COPY scripts ./scripts
 
-RUN npx playwright install chromium
+RUN useradd -m -s /bin/bash -u 1001 streamer
+
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
+RUN npx playwright install chromium \
+ && chmod -R a+rX /app/.playwright
 
 ENV NODE_ENV=production
 ENV DISPLAY=:99
-ENV PULSE_SERVER=unix:/tmp/pulse/native
+ENV PULSE_RUNTIME=/tmp/pulse-runtime
+ENV PULSE_USER=streamer
 
 VOLUME ["/app/data"]
 

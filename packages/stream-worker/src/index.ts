@@ -105,6 +105,11 @@ function spawnFfmpeg(
   console.log("[stream] Starting ffmpeg → YouTube RTMP");
   const proc = spawn("ffmpeg", args, {
     stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      PULSE_SERVER: process.env.PULSE_SERVER,
+      XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR,
+    },
   });
 
   proc.stdout?.on("data", (chunk: Buffer) => {
@@ -179,6 +184,11 @@ async function runStreamLoop(): Promise<void> {
   let browser: Browser | null = null;
   let ffmpeg: ChildProcess | null = null;
   let restarting = false;
+
+  console.log(
+    `[stream] display=${display} pulse=${process.env.PULSE_SERVER ?? "default"} ` +
+      `source=${streamConfig.pulseMonitorSource}`,
+  );
 
   async function cleanup(): Promise<void> {
     if (ffmpeg && !ffmpeg.killed) {

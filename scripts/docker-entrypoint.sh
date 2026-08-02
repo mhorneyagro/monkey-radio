@@ -2,6 +2,8 @@
 set -euo pipefail
 
 SERVICE="${1:-all}"
+PULSE_RUNTIME="${PULSE_RUNTIME:-/tmp/pulse-runtime}"
+PULSE_USER="${PULSE_USER:-streamer}"
 
 restore_database() {
   local db_path="${DATABASE_PATH:-/app/data/monkey-radio.db}"
@@ -36,31 +38,33 @@ restore_database() {
 }
 
 start_pulseaudio() {
-  if PULSE_SERVER="${PULSE_SERVER:-unix:/tmp/pulse/native}" pactl info >/dev/null 2>&1; then
+  mkdir -p "$PULSE_RUNTIME"
+  chown "$PULSE_USER:$PULSE_USER" "$PULSE_RUNTIME"
+  chmod 700 "$PULSE_RUNTIME"
+
+  export PULSE_SERVER="unix:${PULSE_RUNTIME}/pulse/native"
+
+  if gosu "$PULSE_USER" XDG_RUNTIME_DIR="$PULSE_RUNTIME" pactl info >/dev/null 2>&1; then
     echo "[entrypoint] PulseAudio already running"
     return 0
   fi
 
-  mkdir -p /tmp/pulse /root/.config/pulse /var/run/pulse /var/lib/pulse
-
-  if [ "$(id -u)" -eq 0 ]; then
-    pulseaudio --system --daemonize --exit-idle-time=-1 --disallow-exit --log-target=stderr
-    export PULSE_SERVER=unix:/var/run/pulse/native
-  else
-    pulseaudio --daemonize --exit-idle-time=-1 --disallow-exit \
-      --log-target=stderr --file=/tmp/pulse/native
-    export PULSE_SERVER=unix:/tmp/pulse/native
-  fi
+  gosu "$PULSE_USER" XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
+    pulseaudio --daemonize --exit-idle-time=-1 --disallow-exit --log-target=stderr
 
   sleep 2
-  if ! PULSE_SERVER="$PULSE_SERVER" pactl info >/dev/null 2>&1; then
+
+  if ! gosu "$PULSE_USER" XDG_RUNTIME_DIR="$PULSE_RUNTIME" pactl info >/dev/null 2>&1; then
     echo "[entrypoint] PulseAudio failed to start"
     return 1
   fi
 
-  PULSE_SERVER="$PULSE_SERVER" pactl load-module module-null-sink sink_name=stream_sink sink_properties=device.description=StreamSink
-  PULSE_SERVER="$PULSE_SERVER" pactl set-default-sink stream_sink
-  echo "[entrypoint] PulseAudio ready (stream_sink)"
+  gosu "$PULSE_USER" XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
+    pactl load-module module-null-sink sink_name=stream_sink sink_properties=device.description=StreamSink
+  gosu "$PULSE_USER" XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
+    pactl set-default-sink stream_sink
+
+  echo "[entrypoint] PulseAudio ready (stream_sink at $PULSE_SERVER)"
 }
 
 start_xvfb() {
@@ -99,6 +103,13 @@ run_dashboard() {
   npm run dashboard:start &
 }
 
+run_stream_worker() {
+  echo "[entrypoint] Starting stream worker…"
+  export HOME="/home/$PULSE_USER"
+  export XDG_RUNTIME_DIR="$PULSE_RUNTIME"
+  gosu "$PULSE_USER" npm run stream:start &
+}
+
 run_stream() {
   if [ -z "${YOUTUBE_RTMP_URL:-}" ] || [ -z "${YOUTUBE_STREAM_KEY:-}" ]; then
     echo "[entrypoint] YOUTUBE_RTMP_URL / YOUTUBE_STREAM_KEY not set — skipping stream worker"
@@ -111,9 +122,7 @@ run_stream() {
     return 0
   fi
   wait_for_dashboard
-
-  echo "[entrypoint] Starting stream worker…"
-  npm run stream:start &
+  run_stream_worker
 }
 
 case "$SERVICE" in
@@ -129,7 +138,9 @@ case "$SERVICE" in
     start_xvfb
     start_pulseaudio
     wait_for_dashboard
-    exec npm run stream:start
+    export HOME="/home/$PULSE_USER"
+    export XDG_RUNTIME_DIR="$PULSE_RUNTIME"
+    exec gosu "$PULSE_USER" npm run stream:start
     ;;
   all)
     restore_database
