@@ -49,6 +49,7 @@ import {
   getLiveBroadcastStatus,
   listActiveBroadcasts,
   transitionBroadcastToLive,
+  updateLiveBroadcast,
 } from "./youtube/live.js";
 
 const program = new Command();
@@ -239,14 +240,19 @@ program
     console.log(`YOUTUBE_REFRESH_TOKEN=${refreshToken}\n`);
   });
 
+const DEFAULT_LIVE_TITLE =
+  "🔴 24/7 Lofi & Chill Radio Live | Beats to Study, Relax & Sleep";
+const DEFAULT_LIVE_DESCRIPTION =
+  "Non-stop live music 24/7 — lofi, jazz, ambient, rock & synthwave. Perfect for studying, working, relaxing, or sleeping. Chat with DJ Monkey and request your vibe! 🎧";
+
 program
   .command("youtube-live-create")
   .description("Create a YouTube live broadcast + RTMP ingest stream")
-  .option("--title <title>", "Broadcast title", "Monkey Radio — Live 24/7")
+  .option("--title <title>", "Broadcast title", DEFAULT_LIVE_TITLE)
   .option(
     "--description <text>",
     "Broadcast description",
-    "AI DJ radio — live 24/7. Chat with DJ Monkey!",
+    DEFAULT_LIVE_DESCRIPTION,
   )
   .action(async (options: { title: string; description: string }) => {
     const config = loadConfig();
@@ -265,6 +271,46 @@ program
     console.log(`YOUTUBE_STREAM_KEY=${info.streamKey}`);
     console.log(`CHAT_PROVIDER=youtube`);
     console.log(`\nThen start streaming and run: npm run youtube:live-go`);
+  });
+
+program
+  .command("youtube-live-update")
+  .description("Update title and description of the configured live broadcast")
+  .option("--title <title>", "Broadcast title", DEFAULT_LIVE_TITLE)
+  .option(
+    "--description <text>",
+    "Broadcast description",
+    DEFAULT_LIVE_DESCRIPTION,
+  )
+  .option(
+    "--broadcast-id <id>",
+    "Broadcast ID (defaults to YOUTUBE_BROADCAST_ID env)",
+  )
+  .action(async (options: {
+    title: string;
+    description: string;
+    broadcastId?: string;
+  }) => {
+    const config = loadConfig();
+    const auth = requireYouTubeAuth(config);
+    const broadcastId =
+      options.broadcastId ?? process.env.YOUTUBE_BROADCAST_ID;
+
+    if (!broadcastId) {
+      throw new Error(
+        "Set YOUTUBE_BROADCAST_ID in .env or pass --broadcast-id",
+      );
+    }
+
+    const updated = await updateLiveBroadcast(auth, broadcastId, {
+      title: options.title,
+      description: options.description,
+    });
+
+    console.log("\nYouTube live broadcast updated:\n");
+    console.log(`  Broadcast ID: ${broadcastId}`);
+    console.log(`  Title:        ${updated.title}`);
+    console.log(`  Description:  ${updated.description.slice(0, 120)}…`);
   });
 
 program

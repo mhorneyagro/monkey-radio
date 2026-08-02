@@ -37,6 +37,48 @@ async function youtubeFetch<T>(
   return response.json() as Promise<T>;
 }
 
+export async function updateLiveBroadcast(
+  auth: YouTubeAuthConfig,
+  broadcastId: string,
+  snippet: { title: string; description: string },
+): Promise<{ title: string; description: string }> {
+  const current = await youtubeFetch<{
+    items?: Array<{
+      id: string;
+      snippet?: {
+        title?: string;
+        description?: string;
+        scheduledStartTime?: string;
+      };
+    }>;
+  }>(`/liveBroadcasts?part=snippet&id=${broadcastId}`, auth);
+
+  const item = current.items?.[0];
+  if (!item) {
+    throw new Error(`Broadcast not found: ${broadcastId}`);
+  }
+
+  const updated = await youtubeFetch<{
+    id: string;
+    snippet?: { title?: string; description?: string };
+  }>(`/liveBroadcasts?part=snippet`, auth, {
+    method: "PUT",
+    body: JSON.stringify({
+      id: broadcastId,
+      snippet: {
+        title: snippet.title,
+        description: snippet.description,
+        scheduledStartTime: item.snippet?.scheduledStartTime,
+      },
+    }),
+  });
+
+  return {
+    title: updated.snippet?.title ?? snippet.title,
+    description: updated.snippet?.description ?? snippet.description,
+  };
+}
+
 export async function createLiveBroadcast(
   auth: YouTubeAuthConfig,
   title: string,

@@ -28,6 +28,7 @@
     "youtube-auth": "tsx src/index.ts youtube-auth",
     "youtube-live-auth": "tsx src/index.ts youtube-live-auth",
     "youtube-live-create": "tsx src/index.ts youtube-live-create",
+    "youtube-live-update": "tsx src/index.ts youtube-live-update",
     "youtube-live-go": "tsx src/index.ts youtube-live-go",
     "youtube-live-status": "tsx src/index.ts youtube-live-status",
     "suno-login": "tsx src/index.ts suno-login",
