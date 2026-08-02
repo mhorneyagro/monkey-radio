@@ -30,31 +30,6 @@ export function updateNowPlayingStrip(root, data) {
 }
 
 /**
- * @param {HTMLElement | null} root
- * @param {Record<string, unknown> | null | undefined} data
- */
-export function updateSongLinkStrip(root, data) {
-  if (!root) return;
-
-  const labelEl = root.querySelector("[data-song-link-label]");
-
-  const youtubeUrl =
-    data?.phase === "track" && data.track && typeof data.track === "object"
-      ? data.track.youtubeUrl
-      : null;
-
-  if (!data?.playing || data.phase !== "track" || typeof youtubeUrl !== "string" || !youtubeUrl) {
-    root.hidden = true;
-    return;
-  }
-
-  root.hidden = false;
-  if (labelEl) {
-    labelEl.textContent = "Take me to this song →";
-  }
-}
-
-/**
  * @param {Record<string, unknown> | null | undefined} data
  */
 export function extractMoodState(data) {

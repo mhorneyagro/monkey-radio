@@ -1,20 +1,27 @@
 import { randomUUID } from "node:crypto";
 import type {
   BroadcastWorkerConfig,
+  ChatMessage,
   MonkeyRadioDb,
   MoodDecision,
   Track,
+  TrackSelectionHints,
 } from "@monkey-radio/shared";
 import {
+  extractLatestChatRequest,
   getDistinctLlmGenres,
   getRecentPlayedTracks,
   insertDjSegment,
 } from "@monkey-radio/shared";
 import type { ChatBuffer } from "../chat/buffer.js";
-import type { GenrePollResult } from "../chat/poll-manager.js";
 import { selectNextTrack, trackStyle } from "../playlist/selector.js";
 import { decideMood, writeDjScript } from "./llm.js";
 import { synthesizeDjSegment } from "./tts.js";
+
+export interface GenrePollResult {
+  genre: string;
+  totalVotes: number;
+}
 
 export interface DjPipelineResult {
   segmentId: string;
@@ -23,6 +30,28 @@ export interface DjPipelineResult {
   durationSec: number;
   mood: MoodDecision;
   nextTrack: Track;
+}
+
+/** Style/hint filtering only when chat or a poll asked for something specific. */
+export function audienceTrackSelection(
+  chatMessages: ChatMessage[],
+  mood: MoodDecision,
+  pollResult?: GenrePollResult,
+): { hints?: TrackSelectionHints; preferredStyle?: string } | undefined {
+  const pollGenre = pollResult?.genre ?? mood.pollWinner?.genre;
+  if (pollGenre) {
+    return { preferredStyle: pollGenre, hints: { llmGenre: pollGenre } };
+  }
+
+  const chatRequest = extractLatestChatRequest(chatMessages);
+  if (chatRequest?.style) {
+    return {
+      preferredStyle: chatRequest.style,
+      hints: mood.trackHints ?? { llmGenre: chatRequest.style },
+    };
+  }
+
+  return undefined;
 }
 
 export async function generateDjSegment(
@@ -43,15 +72,16 @@ export async function generateDjSegment(
       recentTracks,
       chatMessages,
       availableStyles,
-      pollResult: params.pollResult,
     });
 
-    const preferredStyle =
-      mood.trackHints?.llmGenre ?? mood.nextStyle;
+    const audienceSelection = audienceTrackSelection(
+      chatMessages,
+      mood,
+      params.pollResult,
+    );
     const nextTrack = selectNextTrack(db, config, {
       excludeTrackId: params.lastTrack.id,
-      hints: mood.trackHints,
-      preferredStyle,
+      ...audienceSelection,
     });
 
     const scriptText = await writeDjScript(config, {

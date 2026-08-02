@@ -116,29 +116,6 @@ function parseTrackHints(
   return { llmGenre, nameContains, mood, energyLevel };
 }
 
-function enrichMoodFromPoll(
-  mood: MoodDecision,
-  pollResult?: { winningGenre: string; totalVotes: number },
-): MoodDecision {
-  if (!pollResult) return mood;
-
-  const trackHints = {
-    ...mood.trackHints,
-    llmGenre: pollResult.winningGenre,
-  };
-
-  return {
-    ...mood,
-    nextStyle: pollResult.winningGenre,
-    genreReason: `Chat poll picked ${pollResult.winningGenre} (${pollResult.totalVotes} votes)`,
-    trackHints,
-    pollWinner: {
-      genre: pollResult.winningGenre,
-      totalVotes: pollResult.totalVotes,
-    },
-  };
-}
-
 function enrichMoodFromChat(
   mood: MoodDecision,
   chatMessages: ChatMessage[],
@@ -189,11 +166,10 @@ function enrichMoodFromChat(
 }
 
 function mockMoodDecision(
-  currentStyle: string | undefined,
+  _currentStyle: string | undefined,
   chatMessages: ChatMessage[],
 ): MoodDecision {
   const request = extractLatestChatRequest(chatMessages);
-  const nextStyle = request?.style ?? currentStyle;
   const shoutouts = chatMessages.slice(-3).map((message) => ({
     username: message.username,
     reason: message.message.slice(0, 80),
@@ -202,19 +178,17 @@ function mockMoodDecision(
   let genreReason: string;
   if (request?.style) {
     genreReason = `${request.username} asked for ${request.style} in chat`;
-  } else if (chatMessages.length > 0) {
-    genreReason = "No style requests — staying with the current vibe";
   } else {
-    genreReason = "Quiet chat — keeping the rotation going";
+    genreReason = "No requests — picking a random track from the library";
   }
 
   const mood: MoodDecision = {
-    nextStyle,
+    nextStyle: request?.style,
     mood: request?.style
       ? `Chat wants ${request.style} — ${request.username} called it.`
       : chatMessages.length > 0
-        ? "Chat is active — riding the energy."
-        : "Quiet chat tonight — staying in the pocket.",
+        ? "Chat is active — random pick from the full library."
+        : "Quiet chat — random pick from the full library.",
     energy: request ? 7 : 5,
     shoutouts,
     genreReason,
@@ -231,12 +205,10 @@ export async function decideMood(
     recentTracks: Track[];
     chatMessages: ChatMessage[];
     availableStyles?: string[];
-    pollResult?: { winningGenre: string; totalVotes: number };
   },
 ): Promise<MoodDecision> {
   if (config.llmProvider === "mock") {
-    const mood = mockMoodDecision(params.currentStyle, params.chatMessages);
-    return enrichMoodFromPoll(mood, params.pollResult);
+    return mockMoodDecision(params.currentStyle, params.chatMessages);
   }
 
   const system = `You are the programming director for Monkey Radio, a 24/7 live YouTube station.
@@ -260,10 +232,11 @@ Return JSON:
 
 Rules:
 - READ chat carefully. Honor viewer requests — this is the top priority.
-- If pollWinner is present, treat it as the strongest signal for nextStyle and trackHints.llmGenre.
 - Use availableStyles when picking nextStyle. If chat requests something not in the list, set trackHints.llmGenre to search for it.
 - If chat names a specific song, set trackHints.nameContains.
 - If multiple requests conflict, favor the most recent.
+- If chat has NO music/style requests, omit nextStyle and trackHints — the system picks a totally random track from the full library.
+- Do NOT stay in the current style unless chat explicitly asked for it.
 - shoutouts: 1–3 entries max. Always shout out users who made music requests.
 - genreReason must mention chat when chat influenced the decision.
 - Ignore spam, slurs, bots, and meta commands.`;
@@ -271,12 +244,6 @@ Rules:
   const user = JSON.stringify({
     currentStyle: params.currentStyle,
     availableStyles: params.availableStyles ?? [],
-    pollWinner: params.pollResult
-      ? {
-          genre: params.pollResult.winningGenre,
-          totalVotes: params.pollResult.totalVotes,
-        }
-      : undefined,
     lastTracks: params.recentTracks.map((track) => ({
       title: track.display_name ?? track.title,
       style: track.llm_genre ?? track.genre,
@@ -286,8 +253,7 @@ Rules:
 
   const raw = await chatCompletion(config, system, user);
   const mood = parseMoodDecision(raw, params.currentStyle);
-  const withChat = enrichMoodFromChat(mood, params.chatMessages);
-  return enrichMoodFromPoll(withChat, params.pollResult);
+  return enrichMoodFromChat(mood, params.chatMessages);
 }
 
 function chatRequestMatchesNextTrack(
@@ -322,11 +288,6 @@ function mockDjScript(params: {
   const lastTitle = params.lastTrack.display_name ?? params.lastTrack.title ?? "that track";
   const nextTitle = params.nextTrack.display_name ?? params.nextTrack.title ?? "something fresh";
   const musicBit = `That was ${lastTitle}. Up next: ${nextTitle}.`;
-
-  if (params.mood.pollWinner) {
-    const poll = params.mood.pollWinner;
-    return `${musicBit} Chat picked ${poll.genre} — you voted, we listened. Monkey Radio.`;
-  }
 
   if (request && chatRequestMatchesNextTrack(params.chatMessages, params.nextTrack)) {
     const ack = shoutout
@@ -379,7 +340,6 @@ Music (keep it minimal — do not linger on music):
 - Do NOT describe how the music sounds or feels
 
 Chat (this is where most of your personality goes):
-- If pollWinner is present, briefly confirm chat voted for that style and you're playing it next
 - If recentChat or shoutouts are present, spend most of your words engaging viewers
 - Say usernames out loud — react to what they said, answer questions, shout people out
 - If someone requested a song/style and you're playing it next, briefly confirm by username
@@ -395,7 +355,6 @@ Return JSON: { "script": "..." }`;
   const user = JSON.stringify({
     lastTitle: params.lastTrack.display_name ?? params.lastTrack.title,
     nextTitle: params.nextTrack.display_name ?? params.nextTrack.title,
-    pollWinner: params.mood.pollWinner,
     shoutouts: params.mood.shoutouts.slice(0, 2),
     recentChat: params.chatMessages.slice(-8).map((message) => ({
       username: message.username,
