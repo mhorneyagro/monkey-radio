@@ -36,26 +36,30 @@ restore_database() {
 }
 
 start_pulseaudio() {
-  if pactl info >/dev/null 2>&1; then
+  if PULSE_SERVER="${PULSE_SERVER:-unix:/tmp/pulse/native}" pactl info >/dev/null 2>&1; then
     echo "[entrypoint] PulseAudio already running"
-    return
+    return 0
   fi
 
-  mkdir -p /tmp/pulse
-  local pa_args=(--daemonize --exit-idle-time=-1 --disallow-exit --log-target=stderr --file=/tmp/pulse/native)
+  mkdir -p /tmp/pulse /root/.config/pulse /var/run/pulse /var/lib/pulse
+
   if [ "$(id -u)" -eq 0 ]; then
-    pa_args=(--system "${pa_args[@]}")
+    pulseaudio --system --daemonize --exit-idle-time=-1 --disallow-exit --log-target=stderr
+    export PULSE_SERVER=unix:/var/run/pulse/native
+  else
+    pulseaudio --daemonize --exit-idle-time=-1 --disallow-exit \
+      --log-target=stderr --file=/tmp/pulse/native
+    export PULSE_SERVER=unix:/tmp/pulse/native
   fi
-  pulseaudio "${pa_args[@]}"
 
-  sleep 1
-  export PULSE_SERVER="${PULSE_SERVER:-unix:/tmp/pulse/native}"
-  pactl info >/dev/null 2>&1 || {
+  sleep 2
+  if ! PULSE_SERVER="$PULSE_SERVER" pactl info >/dev/null 2>&1; then
     echo "[entrypoint] PulseAudio failed to start"
     return 1
-  }
-  pactl load-module module-null-sink sink_name=stream_sink sink_properties=device.description=StreamSink
-  pactl set-default-sink stream_sink
+  fi
+
+  PULSE_SERVER="$PULSE_SERVER" pactl load-module module-null-sink sink_name=stream_sink sink_properties=device.description=StreamSink
+  PULSE_SERVER="$PULSE_SERVER" pactl set-default-sink stream_sink
   echo "[entrypoint] PulseAudio ready (stream_sink)"
 }
 
@@ -102,7 +106,10 @@ run_stream() {
   fi
 
   start_xvfb
-  start_pulseaudio
+  if ! start_pulseaudio; then
+    echo "[entrypoint] Stream worker skipped — PulseAudio unavailable"
+    return 0
+  fi
   wait_for_dashboard
 
   echo "[entrypoint] Starting stream worker…"
