@@ -30,6 +30,32 @@ export function isAbsoluteMediaUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
 
+/** Extract a YouTube video ID from watch, youtu.be, or embed URLs. */
+export function parseYouTubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes("youtu.be")) {
+      const id = parsed.pathname.replace(/^\/+/, "").split("/")[0];
+      return id || null;
+    }
+    if (parsed.searchParams.has("v")) {
+      return parsed.searchParams.get("v");
+    }
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const embedIndex = parts.indexOf("embed");
+    if (embedIndex >= 0 && parts[embedIndex + 1]) {
+      return parts[embedIndex + 1];
+    }
+    const shortsIndex = parts.indexOf("shorts");
+    if (shortsIndex >= 0 && parts[shortsIndex + 1]) {
+      return parts[shortsIndex + 1];
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 /** Track audio — CDN when configured and file_path is a storage key, else local API. */
 export function resolveTrackAudioUrl(
   trackId: string,

@@ -36,6 +36,7 @@
     "youtube:live-auth": "npm run youtube-live-auth -w library-worker",
     "youtube:live-create": "npm run youtube-live-create -w library-worker",
     "youtube:live-update": "npm run youtube-live-update -w library-worker",
+    "youtube:batch-update": "npm run youtube-batch-update -w library-worker --",
     "youtube:live-go": "npm run youtube-live-go -w library-worker",
     "youtube:live-status": "npm run youtube-live-status -w library-worker",
     "production:build": "docker compose -f docker-compose.prod.yml build",

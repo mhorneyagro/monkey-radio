@@ -42,6 +42,7 @@ import {
   uploadTrackVideos,
 } from "./pipeline/publish-youtube.js";
 import { removeTrack } from "./remove-track.js";
+import { batchUpdateYouTubeVideos } from "./youtube/batch-update-videos.js";
 import { runYouTubeOAuthFlow, YOUTUBE_LIVE_SCOPES } from "./youtube/oauth-flow.js";
 import { requireYouTubeAuth } from "./youtube/auth.js";
 import {
@@ -271,6 +272,38 @@ program
     console.log(`YOUTUBE_STREAM_KEY=${info.streamKey}`);
     console.log(`CHAT_PROVIDER=youtube`);
     console.log(`\nThen start streaming and run: npm run youtube:live-go`);
+  });
+
+program
+  .command("youtube-batch-update")
+  .description(
+    "Batch-set Creative Commons license and royalty-free descriptions on published track videos",
+  )
+  .option("--dry-run", "Preview updates without calling YouTube")
+  .option("--limit <n>", "Max videos to update", "0")
+  .option("--delay-ms <ms>", "Delay between API updates", "500")
+  .option(
+    "--live-url <url>",
+    "Live stream URL to append in descriptions",
+    process.env.YOUTUBE_LIVE_WATCH_URL ?? "https://www.youtube.com/watch?v=2NhQFX0LABs",
+  )
+  .action(async (options: {
+    dryRun?: boolean;
+    limit: string;
+    delayMs: string;
+    liveUrl: string;
+  }) => {
+    const config = loadConfig();
+    const result = await batchUpdateYouTubeVideos(config, {
+      dryRun: options.dryRun,
+      limit: Number(options.limit) || undefined,
+      delayMs: Number(options.delayMs) || 0,
+      liveStreamUrl: options.liveUrl,
+    });
+
+    console.log(
+      `\nDone: ${result.updated} updated, ${result.skipped} skipped, ${result.failed} failed (${result.total} total).`,
+    );
   });
 
 program

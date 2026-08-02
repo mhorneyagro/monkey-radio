@@ -320,6 +320,16 @@ export function getTrackById(db: MonkeyRadioDb, id: string): Track | undefined {
     | undefined;
 }
 
+export function getTracksWithYouTubeUrl(db: MonkeyRadioDb): Track[] {
+  return db
+    .prepare(
+      `SELECT * FROM tracks
+       WHERE youtube_url IS NOT NULL AND youtube_url != ''
+       ORDER BY display_name, title`,
+    )
+    .all() as Track[];
+}
+
 export function getReadyTracksWithoutYoutube(
   db: MonkeyRadioDb,
   options: { limit?: number; trackId?: string } = {},

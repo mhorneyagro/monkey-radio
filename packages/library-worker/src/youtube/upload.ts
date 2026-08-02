@@ -1,44 +1,29 @@
-import { readFileSync, statSync } from "node:fs";
 import type { Track } from "@monkey-radio/shared";
+import { readFileSync, statSync } from "node:fs";
 import { getYouTubeAccessToken, type YouTubeAuthConfig } from "./auth.js";
+import {
+  buildVideoDescription,
+  buildVideoTags,
+  trackVideoTitle,
+} from "./video-metadata.js";
 
 export interface UploadVideoOptions {
   auth: YouTubeAuthConfig;
   videoPath: string;
   track: Track;
   privacyStatus: "private" | "unlisted" | "public";
-}
-
-function buildDescription(track: Track): string {
-  const title = track.display_name ?? track.title ?? "Untitled";
-  const genre = track.llm_genre ?? track.genre;
-  const lines = [
-    `${title} — Monkey Radio`,
-    "",
-    `Style: ${genre}`,
-  ];
-
-  if (track.bpm) lines.push(`BPM: ${Math.round(track.bpm)}`);
-  if (track.musical_key) lines.push(`Key: ${track.musical_key}`);
-
-  lines.push("", "24/7 AI radio — Monkey Radio");
-  return lines.join("\n");
-}
-
-function buildTags(track: Track): string[] {
-  const genre = track.llm_genre ?? track.genre;
-  const tags = ["Monkey Radio", "instrumental", genre];
-  if (track.genre && track.genre !== genre) tags.push(track.genre);
-  return [...new Set(tags.map((t) => t.slice(0, 30)))].slice(0, 10);
+  liveStreamUrl?: string;
 }
 
 export async function uploadVideoToYouTube(
   options: UploadVideoOptions,
 ): Promise<string> {
   const accessToken = await getYouTubeAccessToken(options.auth);
-  const title = trackTitle(options.track);
-  const description = buildDescription(options.track);
-  const tags = buildTags(options.track);
+  const title = trackVideoTitle(options.track);
+  const description = buildVideoDescription(options.track, {
+    liveStreamUrl: options.liveStreamUrl,
+  });
+  const tags = buildVideoTags(options.track);
 
   const initResponse = await fetch(
     "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
@@ -59,6 +44,7 @@ export async function uploadVideoToYouTube(
         },
         status: {
           privacyStatus: options.privacyStatus,
+          license: "creativeCommon",
           selfDeclaredMadeForKids: false,
         },
       }),
@@ -97,9 +83,4 @@ export async function uploadVideoToYouTube(
   }
 
   return `https://www.youtube.com/watch?v=${result.id}`;
-}
-
-function trackTitle(track: Track): string {
-  const name = track.display_name ?? track.title ?? "Untitled";
-  return `${name} | Monkey Radio`.slice(0, 100);
 }
