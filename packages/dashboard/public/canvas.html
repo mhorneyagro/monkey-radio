@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Monkey Radio — Stream Canvas</title>
+    <link rel="icon" href="/logo-chrome.png" type="image/png" />
+    <link rel="stylesheet" href="/canvas.css" />
+  </head>
+  <body>
+    <main class="youtube-canvas">
+      <canvas id="viz" aria-hidden="true"></canvas>
+
+      <div class="logo-wrap">
+        <div class="logo-glow" id="logo-glow"></div>
+        <img
+          src="/logo-chrome.png"
+          alt="Monkey Radio"
+          class="logo"
+        />
+      </div>
+
+      <div class="now-playing-strip" id="now-playing-strip" hidden>
+        <span class="now-playing-strip__ring" aria-hidden="true"></span>
+        <div class="now-playing-strip__inner">
+          <p class="strip-status" data-strip-status>Now playing</p>
+          <p class="strip-row">
+            <span class="strip-genre" data-strip-genre>—</span>
+            <span class="strip-title" data-strip-title>—</span>
+          </p>
+        </div>
+      </div>
+
+      <button type="button" class="start-overlay hidden" id="start-overlay">
+        Click to sync audio
+      </button>
+    </main>
+
+    <audio id="audio" preload="auto"></audio>
+    <audio id="dj-audio" preload="auto"></audio>
+    <script src="/canvas.js" type="module"></script>
+  </body>
+</html>

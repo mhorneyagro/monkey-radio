@@ -1,0 +1,28 @@
+# Monkey Radio — production stack
+# Run: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  monkey-radio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: monkey-radio
+    restart: unless-stopped
+    ports:
+      - "${DASHBOARD_PORT:-5400}:5400"
+    env_file:
+      - .env
+    environment:
+      DASHBOARD_URL: http://localhost:5400
+      DISPLAY: ":99"
+      STREAM_DISPLAY: ":99"
+      STREAM_PULSE_MONITOR: stream_sink.monitor
+    volumes:
+      - ./data:/app/data
+    shm_size: "2gb"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5400/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Monkey Radio</title>
+    <link rel="icon" href="/logo-chrome.png" type="image/png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="player">
+      <section class="player-top">
+        <div class="player-top-row">
+          <div class="stream-canvas-frame" id="stream-canvas-frame">
+            <canvas id="stream-viz" class="stream-viz" aria-hidden="true"></canvas>
+            <div class="stream-logo-wrap">
+              <div class="stream-logo-glow" id="stream-logo-glow"></div>
+              <img
+                src="/logo-chrome.png"
+                alt="Monkey Radio"
+                class="stream-logo"
+              />
+            </div>
+            <div class="now-playing-strip now-playing-strip--preview" id="now-playing-strip" hidden>
+              <span class="now-playing-strip__ring" aria-hidden="true"></span>
+              <div class="now-playing-strip__inner">
+                <p class="strip-status" data-strip-status>Now playing</p>
+                <p class="strip-row">
+                  <span class="strip-genre" data-strip-genre>—</span>
+                  <span class="strip-title" data-strip-title>—</span>
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="stream-mute-btn"
+              id="mute-btn"
+              aria-label="Mute"
+              data-state="mute"
+            >
+              <svg class="stream-mute-btn__icon stream-mute-btn__icon--volume" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M11 5 6 9H3v6h3l5 4V5Zm2.5 4.5a4.5 4.5 0 0 1 0 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M15.5 7.5a7.5 7.5 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <svg class="stream-mute-btn__icon stream-mute-btn__icon--muted" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M11 5 6 9H3v6h3l5 4V5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                <path d="m16 9 5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+              <svg class="stream-mute-btn__icon stream-mute-btn__icon--play" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 5v14l11-7L8 5Z" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
+
+          <aside class="chat-panel" aria-label="Live chat">
+            <div class="chat-panel__header">
+              <h2>Live chat</h2>
+            </div>
+
+            <ul class="chat-list" id="chat-list">
+              <li class="chat-empty">Loading chat…</li>
+            </ul>
+
+            <form class="chat-form" id="chat-form">
+              <label class="sr-only" for="chat-input">Message</label>
+              <input
+                id="chat-input"
+                class="chat-input"
+                type="text"
+                maxlength="500"
+                placeholder="Send a message…"
+                autocomplete="off"
+                required
+              />
+              <button type="submit" class="chat-send">Send</button>
+            </form>
+          </aside>
+        </div>
+
+        <p class="stream-preview-footer">
+          <button type="button" class="dev-control" id="skip-transition-btn">
+            Skip to transition (10s left)
+          </button>
+          <a href="/canvas/stream" target="_blank" rel="noopener">Open stream canvas</a>
+          ·
+          <a href="/canvas" target="_blank" rel="noopener">Open 1920×1080 overlay</a>
+        </p>
+      </section>
+
+      <section class="status-bar" aria-label="System status">
+        <div id="status-panel">Loading status…</div>
+        <div class="admin-key-row">
+          <label for="admin-key-input">Admin key</label>
+          <input
+            id="admin-key-input"
+            type="password"
+            placeholder="For skip / admin controls"
+            autocomplete="off"
+          />
+          <button type="button" id="admin-key-save">Save</button>
+        </div>
+      </section>
+
+      <section class="now-playing">
+        <p class="genre" id="genre">—</p>
+        <h2 id="title">Waiting for broadcast worker</h2>
+        <p class="meta" id="meta">Start with: npm run broadcast:start</p>
+
+        <div class="progress-wrap">
+          <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <p class="time" id="time">0:00 / 0:00</p>
+      </section>
+
+      <audio id="audio" preload="auto"></audio>
+      <audio id="dj-audio" preload="auto"></audio>
+
+      <section class="controls">
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="0.85" aria-label="Volume" />
+      </section>
+
+      <div class="history-grid">
+        <section class="history">
+          <h3>Recently played</h3>
+          <ul id="history-list"></ul>
+        </section>
+
+        <section class="history">
+          <h3>DJ segments</h3>
+          <ul id="dj-list"></ul>
+        </section>
+      </div>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

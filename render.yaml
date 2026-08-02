@@ -1,0 +1,101 @@
+# Monkey Radio on Render
+# Docs: https://render.com/docs/blueprint-spec
+
+envVarGroups:
+  - name: monkey-radio-config
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CHAT_PROVIDER
+        value: youtube
+      - key: DEFAULT_GENRE
+        value: lofi
+      - key: MIN_LIBRARY_PER_GENRE
+        value: "1"
+      - key: AVOID_REPLAY_LIMIT
+        value: "50"
+      - key: CROSSFADE_SEC
+        value: "5"
+      - key: MIN_TRACKS_BEFORE_DJ
+        value: "1"
+      - key: DJ_MIN_INTERVAL_SEC
+        value: "120"
+      - key: DJ_PREP_LEAD_SEC
+        value: "45"
+      - key: CHAT_POLL_INTERVAL_MS
+        value: "5000"
+      - key: CHAT_WINDOW_MS
+        value: "300000"
+      - key: BROADCAST_STALE_SEC
+        value: "300"
+      - key: LLM_MODEL
+        value: gpt-4o-mini
+      - key: ELEVENLABS_MODEL
+        value: eleven_turbo_v2_5
+      - key: DASHBOARD_URL
+        value: http://localhost:5400
+      - key: DISPLAY
+        value: ":99"
+      - key: STREAM_DISPLAY
+        value: ":99"
+      - key: STREAM_PULSE_MONITOR
+        value: stream_sink.monitor
+      - key: DATABASE_PATH
+        value: /app/data/monkey-radio.db
+      - key: LIBRARY_PATH
+        value: /app/data/library
+      - key: DJ_PATH
+        value: /app/data/dj
+
+services:
+  - type: web
+    name: monkey-radio
+    runtime: docker
+    plan: pro
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerCommand: all
+    healthCheckPath: /health
+    autoDeploy: true
+    numInstances: 1
+    disk:
+      name: monkey-radio-data
+      mountPath: /app/data
+      sizeGB: 10
+    envVars:
+      - fromGroup: monkey-radio-config
+      # Secrets — paste from .env.render when prompted (sync: false)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
+      - key: LIBRARY_CDN_URL
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_ENDPOINT
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: YOUTUBE_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_REFRESH_TOKEN
+        sync: false
+      - key: YOUTUBE_BROADCAST_ID
+        sync: false
+      - key: YOUTUBE_VIDEO_ID
+        sync: false
+      - key: YOUTUBE_RTMP_URL
+        sync: false
+      - key: YOUTUBE_STREAM_KEY
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false

@@ -1,0 +1,10 @@
+services:
+  suno-api:
+    build:
+      context: ./upstream
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    env_file:
+      - .env
+    restart: unless-stopped

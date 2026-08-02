@@ -1,0 +1,46 @@
+{
+  "name": "library-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "library-worker": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "cli": "tsx src/index.ts",
+    "fill": "tsx src/index.ts fill",
+    "watch": "tsx src/index.ts watch",
+    "status": "tsx src/index.ts status",
+    "retry-failed": "tsx src/index.ts retry-failed",
+    "health": "tsx src/index.ts health",
+    "seed": "tsx src/index.ts seed",
+    "import-youtube": "tsx src/index.ts import-youtube",
+    "import-analysis": "tsx src/index.ts import-analysis",
+    "generate": "tsx src/index.ts generate",
+    "name-tracks": "tsx src/index.ts name-tracks",
+    "process-staging": "tsx src/index.ts process-staging",
+    "record-videos": "tsx src/index.ts record-videos",
+    "upload-youtube": "tsx src/index.ts upload-youtube",
+    "publish-youtube": "tsx src/index.ts publish-youtube",
+    "youtube-auth": "tsx src/index.ts youtube-auth",
+    "youtube-live-auth": "tsx src/index.ts youtube-live-auth",
+    "youtube-live-create": "tsx src/index.ts youtube-live-create",
+    "youtube-live-go": "tsx src/index.ts youtube-live-go",
+    "youtube-live-status": "tsx src/index.ts youtube-live-status",
+    "suno-login": "tsx src/index.ts suno-login",
+    "postinstall": "playwright install chromium 2>/dev/null || true"
+  },
+  "dependencies": {
+    "@monkey-radio/shared": "*",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "playwright": "^1.51.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
