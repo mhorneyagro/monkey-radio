@@ -26,6 +26,14 @@ envVarGroups:
         value: "5000"
       - key: CHAT_WINDOW_MS
         value: "300000"
+      - key: YOUTUBE_POLLS_ENABLED
+        value: "true"
+      - key: YOUTUBE_POLL_OPEN_DELAY_SEC
+        value: "10"
+      - key: YOUTUBE_POLL_CLOSE_LEAD_SEC
+        value: "5"
+      - key: YOUTUBE_POLL_MIN_VOTES
+        value: "1"
       - key: BROADCAST_STALE_SEC
         value: "300"
       - key: LLM_MODEL

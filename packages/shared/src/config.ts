@@ -122,6 +122,10 @@ const broadcastWorkerConfigSchema = z.object({
   minTracksBeforeDj: z.coerce.number().int().positive().default(1),
   djMinIntervalSec: z.coerce.number().int().positive().default(120),
   djPrepLeadSec: z.coerce.number().int().positive().default(30),
+  youtubePollsEnabled: z.coerce.boolean().default(true),
+  youtubePollOpenDelaySec: z.coerce.number().int().nonnegative().default(10),
+  youtubePollCloseLeadSec: z.coerce.number().int().nonnegative().default(5),
+  youtubePollMinVotes: z.coerce.number().int().nonnegative().default(1),
 });
 
 export type BroadcastWorkerConfig = z.infer<typeof broadcastWorkerConfigSchema>;
@@ -162,7 +166,32 @@ export function loadBroadcastWorkerConfig(
     minTracksBeforeDj: env.MIN_TRACKS_BEFORE_DJ,
     djMinIntervalSec: env.DJ_MIN_INTERVAL_SEC,
     djPrepLeadSec: env.DJ_PREP_LEAD_SEC,
+    youtubePollsEnabled:
+      env.YOUTUBE_POLLS_ENABLED === undefined
+        ? true
+        : env.YOUTUBE_POLLS_ENABLED !== "false" &&
+          env.YOUTUBE_POLLS_ENABLED !== "0",
+    youtubePollOpenDelaySec: env.YOUTUBE_POLL_OPEN_DELAY_SEC,
+    youtubePollCloseLeadSec: env.YOUTUBE_POLL_CLOSE_LEAD_SEC,
+    youtubePollMinVotes: env.YOUTUBE_POLL_MIN_VOTES,
   });
+
+  const chatProvider =
+    parsed.chatProvider === "youtube" &&
+    parsed.youtubeVideoId &&
+    parsed.youtubeApiKey
+      ? "youtube"
+      : parsed.chatProvider === "none"
+        ? "none"
+        : parsed.chatProvider === "mock"
+          ? "mock"
+          : "mock";
+
+  const hasYouTubeOAuth = Boolean(
+    env.YOUTUBE_CLIENT_ID &&
+      env.YOUTUBE_CLIENT_SECRET &&
+      env.YOUTUBE_REFRESH_TOKEN,
+  );
 
   return {
     ...parsed,
@@ -178,16 +207,11 @@ export function loadBroadcastWorkerConfig(
       "elevenlabs",
       "mock",
     ),
-    chatProvider:
-      parsed.chatProvider === "youtube" &&
-      parsed.youtubeVideoId &&
-      parsed.youtubeApiKey
-        ? "youtube"
-        : parsed.chatProvider === "none"
-          ? "none"
-          : parsed.chatProvider === "mock"
-            ? "mock"
-            : "mock",
+    chatProvider,
+    youtubePollsEnabled:
+      parsed.youtubePollsEnabled &&
+      hasYouTubeOAuth &&
+      chatProvider === "youtube",
   };
 }
 

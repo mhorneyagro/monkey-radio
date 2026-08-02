@@ -116,6 +116,29 @@ function parseTrackHints(
   return { llmGenre, nameContains, mood, energyLevel };
 }
 
+function enrichMoodFromPoll(
+  mood: MoodDecision,
+  pollResult?: { winningGenre: string; totalVotes: number },
+): MoodDecision {
+  if (!pollResult) return mood;
+
+  const trackHints = {
+    ...mood.trackHints,
+    llmGenre: pollResult.winningGenre,
+  };
+
+  return {
+    ...mood,
+    nextStyle: pollResult.winningGenre,
+    genreReason: `Chat poll picked ${pollResult.winningGenre} (${pollResult.totalVotes} votes)`,
+    trackHints,
+    pollWinner: {
+      genre: pollResult.winningGenre,
+      totalVotes: pollResult.totalVotes,
+    },
+  };
+}
+
 function enrichMoodFromChat(
   mood: MoodDecision,
   chatMessages: ChatMessage[],
@@ -208,10 +231,12 @@ export async function decideMood(
     recentTracks: Track[];
     chatMessages: ChatMessage[];
     availableStyles?: string[];
+    pollResult?: { winningGenre: string; totalVotes: number };
   },
 ): Promise<MoodDecision> {
   if (config.llmProvider === "mock") {
-    return mockMoodDecision(params.currentStyle, params.chatMessages);
+    const mood = mockMoodDecision(params.currentStyle, params.chatMessages);
+    return enrichMoodFromPoll(mood, params.pollResult);
   }
 
   const system = `You are the programming director for Monkey Radio, a 24/7 live YouTube station.
@@ -235,6 +260,7 @@ Return JSON:
 
 Rules:
 - READ chat carefully. Honor viewer requests — this is the top priority.
+- If pollWinner is present, treat it as the strongest signal for nextStyle and trackHints.llmGenre.
 - Use availableStyles when picking nextStyle. If chat requests something not in the list, set trackHints.llmGenre to search for it.
 - If chat names a specific song, set trackHints.nameContains.
 - If multiple requests conflict, favor the most recent.
@@ -245,6 +271,12 @@ Rules:
   const user = JSON.stringify({
     currentStyle: params.currentStyle,
     availableStyles: params.availableStyles ?? [],
+    pollWinner: params.pollResult
+      ? {
+          genre: params.pollResult.winningGenre,
+          totalVotes: params.pollResult.totalVotes,
+        }
+      : undefined,
     lastTracks: params.recentTracks.map((track) => ({
       title: track.display_name ?? track.title,
       style: track.llm_genre ?? track.genre,
@@ -254,7 +286,8 @@ Rules:
 
   const raw = await chatCompletion(config, system, user);
   const mood = parseMoodDecision(raw, params.currentStyle);
-  return enrichMoodFromChat(mood, params.chatMessages);
+  const withChat = enrichMoodFromChat(mood, params.chatMessages);
+  return enrichMoodFromPoll(withChat, params.pollResult);
 }
 
 function chatRequestMatchesNextTrack(
@@ -289,6 +322,11 @@ function mockDjScript(params: {
   const lastTitle = params.lastTrack.display_name ?? params.lastTrack.title ?? "that track";
   const nextTitle = params.nextTrack.display_name ?? params.nextTrack.title ?? "something fresh";
   const musicBit = `That was ${lastTitle}. Up next: ${nextTitle}.`;
+
+  if (params.mood.pollWinner) {
+    const poll = params.mood.pollWinner;
+    return `${musicBit} Chat picked ${poll.genre} — you voted, we listened. Monkey Radio.`;
+  }
 
   if (request && chatRequestMatchesNextTrack(params.chatMessages, params.nextTrack)) {
     const ack = shoutout
@@ -341,6 +379,7 @@ Music (keep it minimal — do not linger on music):
 - Do NOT describe how the music sounds or feels
 
 Chat (this is where most of your personality goes):
+- If pollWinner is present, briefly confirm chat voted for that style and you're playing it next
 - If recentChat or shoutouts are present, spend most of your words engaging viewers
 - Say usernames out loud — react to what they said, answer questions, shout people out
 - If someone requested a song/style and you're playing it next, briefly confirm by username
@@ -356,6 +395,7 @@ Return JSON: { "script": "..." }`;
   const user = JSON.stringify({
     lastTitle: params.lastTrack.display_name ?? params.lastTrack.title,
     nextTitle: params.nextTrack.display_name ?? params.nextTrack.title,
+    pollWinner: params.mood.pollWinner,
     shoutouts: params.mood.shoutouts.slice(0, 2),
     recentChat: params.chatMessages.slice(-8).map((message) => ({
       username: message.username,

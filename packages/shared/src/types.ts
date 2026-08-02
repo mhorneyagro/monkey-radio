@@ -83,6 +83,11 @@ export interface MoodDecision {
     mood?: string;
     energyLevel?: "low" | "medium" | "high";
   };
+  /** Winner from the live chat genre poll, when enough votes were cast. */
+  pollWinner?: {
+    genre: string;
+    totalVotes: number;
+  };
 }
 
 export interface BroadcastState {

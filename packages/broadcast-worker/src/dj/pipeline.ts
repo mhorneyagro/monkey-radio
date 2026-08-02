@@ -11,6 +11,7 @@ import {
   insertDjSegment,
 } from "@monkey-radio/shared";
 import type { ChatBuffer } from "../chat/buffer.js";
+import type { GenrePollResult } from "../chat/poll-manager.js";
 import { selectNextTrack, trackStyle } from "../playlist/selector.js";
 import { decideMood, writeDjScript } from "./llm.js";
 import { synthesizeDjSegment } from "./tts.js";
@@ -30,6 +31,7 @@ export async function generateDjSegment(
   chatBuffer: ChatBuffer,
   params: {
     lastTrack: Track;
+    pollResult?: GenrePollResult;
   },
 ): Promise<DjPipelineResult | null> {
   try {
@@ -41,6 +43,7 @@ export async function generateDjSegment(
       recentTracks,
       chatMessages,
       availableStyles,
+      pollResult: params.pollResult,
     });
 
     const preferredStyle =
@@ -78,6 +81,11 @@ export async function generateDjSegment(
     }
     if (mood.trackHints?.llmGenre) {
       console.log(`[dj track hint] style=${mood.trackHints.llmGenre}`);
+    }
+    if (mood.pollWinner) {
+      console.log(
+        `[dj poll] winner=${mood.pollWinner.genre} (${mood.pollWinner.totalVotes} votes)`,
+      );
     }
     console.log(`[dj script] ${scriptText.slice(0, 120)}…`);
 

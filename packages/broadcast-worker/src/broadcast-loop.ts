@@ -8,6 +8,13 @@ import {
   updateBroadcastState,
 } from "@monkey-radio/shared";
 import type { ChatBuffer } from "./chat/buffer.js";
+import {
+  closeGenrePoll,
+  isPollsEnabled,
+  openGenrePoll,
+  resetPollState,
+  type GenrePollResult,
+} from "./chat/poll-manager.js";
 import { announceTrackInLiveChat } from "./chat/track-announcer.js";
 import { generateDjSegment, type DjPipelineResult } from "./dj/pipeline.js";
 import { selectNextTrack, trackStyle } from "./playlist/selector.js";
@@ -182,6 +189,20 @@ async function playTrack(
 
   void announceTrackInLiveChat(config, track);
 
+  const pollsEnabled = isPollsEnabled(config);
+  const pollOpenMs = config.youtubePollOpenDelaySec * 1000;
+  const pollCloseMs = Math.max(
+    0,
+    prepStartMs - config.youtubePollCloseLeadSec * 1000,
+  );
+  let pollOpened = false;
+  let pollClosed = false;
+  let pollResult: GenrePollResult | null = null;
+
+  if (pollsEnabled) {
+    resetPollState();
+  }
+
   if (!scheduleDj) {
     while (Date.now() - trackStartMs(db, startedAt) < durationMs) {
       consumeSkipTrack(db);
@@ -200,10 +221,26 @@ async function playTrack(
     consumeSkipTrack(db);
     const elapsed = Date.now() - trackStartMs(db, startedAt);
 
+    if (pollsEnabled && !pollOpened && elapsed >= pollOpenMs) {
+      pollOpened = true;
+      void openGenrePoll(config, db, trackStyle(track));
+    }
+
+    if (pollsEnabled && pollOpened && !pollClosed && elapsed >= pollCloseMs) {
+      pollClosed = true;
+      pollResult = await closeGenrePoll(config, config.youtubePollMinVotes);
+    }
+
     if (!djPromise && elapsed >= prepStartMs) {
+      if (pollsEnabled && pollOpened && !pollClosed) {
+        pollClosed = true;
+        pollResult = await closeGenrePoll(config, config.youtubePollMinVotes);
+      }
+
       console.log("[broadcast] preparing DJ segment");
       djPromise = generateDjSegment(db, config, chatBuffer, {
         lastTrack: track,
+        pollResult: pollResult ?? undefined,
       });
     }
 
@@ -287,7 +324,7 @@ export async function runBroadcastLoop(
 
   console.log("Monkey Radio broadcast started");
   console.log(
-    `[dj] llm=${config.llmProvider} tts=${config.ttsProvider} chat=${config.chatProvider} fade=${config.crossfadeSec}s`,
+    `[dj] llm=${config.llmProvider} tts=${config.ttsProvider} chat=${config.chatProvider} polls=${config.youtubePollsEnabled ? "on" : "off"} fade=${config.crossfadeSec}s`,
   );
 
   while (true) {
