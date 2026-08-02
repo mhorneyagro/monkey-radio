@@ -69,6 +69,7 @@ RUN useradd -m -s /bin/bash -u 1001 streamer
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
 RUN npx playwright install chromium \
+ && npx playwright install-deps chromium \
  && chmod -R a+rX /app/.playwright
 
 ENV NODE_ENV=production
