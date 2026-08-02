@@ -6,7 +6,6 @@ export function updateNowPlayingStrip(root, data) {
   if (!root) return;
 
   const statusEl = root.querySelector("[data-strip-status]");
-  const genreEl = root.querySelector("[data-strip-genre]");
   const titleEl = root.querySelector("[data-strip-title]");
 
   if (!data?.playing) {
@@ -18,7 +17,6 @@ export function updateNowPlayingStrip(root, data) {
 
   if (data.phase === "dj" && data.djSegment) {
     if (statusEl) statusEl.textContent = "DJ Monkey";
-    if (genreEl) genreEl.textContent = "on air";
     if (titleEl) {
       const script = data.djSegment.scriptText ?? "";
       titleEl.textContent =
@@ -28,7 +26,6 @@ export function updateNowPlayingStrip(root, data) {
   }
 
   if (statusEl) statusEl.textContent = "Now playing";
-  if (genreEl) genreEl.textContent = data.track?.genre ?? "—";
   if (titleEl) titleEl.textContent = data.track?.title ?? "Untitled";
 }
 
