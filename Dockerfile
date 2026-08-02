@@ -22,9 +22,11 @@ RUN npm ci --include=dev --ignore-scripts \
  && test -f node_modules/@monkey-radio/shared/package.json
 
 RUN ./node_modules/.bin/tsc -b packages/shared \
- && ./node_modules/.bin/tsc -b packages/broadcast-worker \
- && ./node_modules/.bin/tsc -b packages/dashboard \
- && ./node_modules/.bin/tsc -b packages/stream-worker
+ && test -f packages/shared/dist/index.d.ts
+
+RUN npm run build -w broadcast-worker \
+ && npm run build -w @monkey-radio/dashboard \
+ && npm run build -w stream-worker
 
 # Runtime image with ffmpeg, Xvfb, PulseAudio, Playwright Chromium
 FROM node:20-bookworm
