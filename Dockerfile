@@ -6,6 +6,7 @@ WORKDIR /app
 # Render injects NODE_ENV=production — override so devDependencies (typescript) install
 ENV NODE_ENV=development
 ENV NPM_CONFIG_PRODUCTION=false
+ENV NPM_CONFIG_OMIT_DEV=false
 ENV CI=true
 
 # better-sqlite3 native compile
