@@ -3,7 +3,7 @@ import { config } from "dotenv";
 import { spawn, type ChildProcess } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Browser } from "playwright";
+import { chromium, type BrowserContext, type Page } from "playwright";
 import {
   loadStreamWorkerConfig,
   resolveStreamConfigPaths,
@@ -20,6 +20,10 @@ const CHROMIUM_ARGS = [
   "--disable-dev-shm-usage",
   "--window-size=1920,1080",
   "--window-position=0,0",
+  "--hide-scrollbars",
+  "--disable-infobars",
+  "--disable-session-crashed-bubble",
+  "--force-device-scale-factor=1",
 ];
 
 function sleep(ms: number): Promise<void> {
@@ -130,27 +134,29 @@ function spawnFfmpeg(
 async function launchBrowser(
   dashboardUrl: string,
   display: string,
-): Promise<{ browser: Browser; pageUrl: string }> {
+): Promise<{ context: BrowserContext; page: Page }> {
   const canvasUrl = `${dashboardUrl.replace(/\/+$/, "")}/canvas/stream`;
-  console.log(`[stream] Opening ${canvasUrl}`);
+  console.log(`[stream] Opening ${canvasUrl} (app mode)`);
 
-  const browser = await chromium.launch({
+  const context = await chromium.launchPersistentContext("/tmp/chromium-stream", {
     headless: false,
-    args: CHROMIUM_ARGS,
+    args: [...CHROMIUM_ARGS, `--app=${canvasUrl}`],
+    viewport: null,
+    deviceScaleFactor: 1,
+    ignoreDefaultArgs: ["--enable-automation"],
     env: {
       ...process.env,
       DISPLAY: display,
     },
   });
 
-  const context = await browser.newContext({
-    viewport: { width: 1920, height: 1080 },
-    deviceScaleFactor: 1,
-    recordVideo: undefined,
-  });
+  const page = context.pages()[0] ?? (await context.newPage());
+  if (page.url() === "about:blank") {
+    await page.goto(canvasUrl, { waitUntil: "networkidle" });
+  }
 
-  const page = await context.newPage();
-  await page.goto(canvasUrl, { waitUntil: "networkidle" });
+  await page.emulateMedia({ muted: false });
+  await page.bringToFront();
 
   // Wait for stream-ready signal from canvas
   await page.waitForFunction(
@@ -158,8 +164,15 @@ async function launchBrowser(
     { timeout: 60_000 },
   );
 
+  await page.evaluate(() => {
+    for (const audio of document.querySelectorAll("audio")) {
+      audio.muted = false;
+      audio.volume = 1;
+    }
+  });
+
   console.log("[stream] Canvas audio synced and ready");
-  return { browser, pageUrl: canvasUrl };
+  return { context, page };
 }
 
 async function runStreamLoop(): Promise<void> {
@@ -181,7 +194,7 @@ async function runStreamLoop(): Promise<void> {
   );
 
   const display = streamConfig.display;
-  let browser: Browser | null = null;
+  let context: BrowserContext | null = null;
   let ffmpeg: ChildProcess | null = null;
   let restarting = false;
 
@@ -195,16 +208,16 @@ async function runStreamLoop(): Promise<void> {
       ffmpeg.kill("SIGTERM");
       ffmpeg = null;
     }
-    if (browser) {
-      await browser.close().catch(() => {});
-      browser = null;
+    if (context) {
+      await context.close().catch(() => {});
+      context = null;
     }
   }
 
   async function start(): Promise<void> {
     await cleanup();
     const launched = await launchBrowser(dashboardUrl, display);
-    browser = launched.browser;
+    context = launched.context;
     ffmpeg = spawnFfmpeg(streamConfig, display, rtmpUrl);
 
     ffmpeg.on("exit", (code, signal) => {

@@ -30,8 +30,17 @@ const visualizer = createVisualizer({
 
 window.__STREAM_READY__ = false;
 
+function unmuteAudioElements() {
+  for (const el of [trackAudio, djAudio]) {
+    el.muted = false;
+    el.volume = 1;
+  }
+}
+
 async function syncPlayback() {
   await playback.resume();
+  unmuteAudioElements();
+  playback.setVolume(1);
   const primary = playback.getPrimaryAudio();
   try {
     await primary.play();
@@ -71,6 +80,7 @@ const readyInterval = setInterval(async () => {
     clearInterval(readyInterval);
     return;
   }
+  unmuteAudioElements();
   await refreshNowPlaying();
   await syncPlayback();
 }, 2000);
