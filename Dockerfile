@@ -3,14 +3,10 @@ FROM node:20-bookworm AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-COPY tsconfig.base.json ./
-COPY packages/shared ./packages/shared
-COPY packages/broadcast-worker ./packages/broadcast-worker
-COPY packages/dashboard ./packages/dashboard
-COPY packages/stream-worker ./packages/stream-worker
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages ./packages
 
-RUN npm ci --workspace @monkey-radio/shared --workspace broadcast-worker --workspace @monkey-radio/dashboard --workspace stream-worker
+RUN npm ci
 
 RUN npm run build -w @monkey-radio/shared \
  && npm run build -w broadcast-worker \
@@ -43,7 +39,7 @@ COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/packages/broadcast-worker ./packages/broadcast-worker
 COPY --from=builder /app/packages/dashboard ./packages/dashboard
 COPY --from=builder /app/packages/stream-worker ./packages/stream-worker
-COPY package.json ./
+COPY package.json package-lock.json ./
 COPY tsconfig.base.json ./
 COPY assets ./assets
 COPY logo-*.png ./

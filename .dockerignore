@@ -1,0 +1,11 @@
+node_modules
+data
+.git
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+__pycache__
+*.tsbuildinfo
+infra/suno-api/upstream
