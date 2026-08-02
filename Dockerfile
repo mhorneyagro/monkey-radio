@@ -38,6 +38,7 @@ FROM node:20-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     xvfb \
+    x11-utils \
     pulseaudio \
     pulseaudio-utils \
     gosu \

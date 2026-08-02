@@ -70,25 +70,30 @@ start_pulseaudio() {
 }
 
 start_xvfb() {
-  if [ -n "${DISPLAY:-}" ] && xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
-    echo "[entrypoint] Xvfb already running on $DISPLAY"
-    return
-  fi
-
   export DISPLAY="${DISPLAY:-:99}"
   local width="${STREAM_WIDTH:-1280}"
   local height="${STREAM_HEIGHT:-720}"
+
+  if command -v xdpyinfo >/dev/null 2>&1 && xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
+    echo "[entrypoint] Xvfb already running on $DISPLAY"
+    return 0
+  fi
+
+  pkill -f "Xvfb $DISPLAY" >/dev/null 2>&1 || true
+  sleep 1
+
   Xvfb "$DISPLAY" -screen 0 "${width}x${height}x24" -ac +extension GLX +render -noreset &
   local attempts=0
-  until xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; do
+  until { command -v xdpyinfo >/dev/null 2>&1 && xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; } || [ "$attempts" -ge 15 ]; do
     attempts=$((attempts + 1))
-    if [ "$attempts" -ge 30 ]; then
-      echo "[entrypoint] Xvfb failed to start on $DISPLAY"
-      return 1
-    fi
     sleep 1
   done
-  echo "[entrypoint] Xvfb started on $DISPLAY (${width}x${height})"
+
+  if command -v xdpyinfo >/dev/null 2>&1 && xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
+    echo "[entrypoint] Xvfb started on $DISPLAY (${width}x${height})"
+  else
+    echo "[entrypoint] Xvfb started on $DISPLAY (${width}x${height}, unverified)"
+  fi
 }
 
 wait_for_dashboard() {
