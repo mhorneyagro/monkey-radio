@@ -41,6 +41,7 @@ import {
   recordTrackVideos,
   uploadTrackVideos,
 } from "./pipeline/publish-youtube.js";
+import { removeTrack } from "./remove-track.js";
 import { runYouTubeOAuthFlow, YOUTUBE_LIVE_SCOPES } from "./youtube/oauth-flow.js";
 import { requireYouTubeAuth } from "./youtube/auth.js";
 import {
@@ -603,6 +604,28 @@ program
     }
 
     db.close();
+  });
+
+program
+  .command("remove-track")
+  .description("Remove a track from the library database, disk, and CDN")
+  .option("--id <trackId>", "Track UUID")
+  .option("--title <query>", "Match track title (partial, case-sensitive SQL LIKE)")
+  .option("--dry-run", "Show matches without deleting")
+  .option("--skip-cdn", "Do not delete the MP3 from R2/CDN")
+  .action(async (options: {
+    id?: string;
+    title?: string;
+    dryRun?: boolean;
+    skipCdn?: boolean;
+  }) => {
+    const config = loadConfig();
+    await removeTrack(config, {
+      trackId: options.id,
+      title: options.title,
+      dryRun: options.dryRun,
+      skipCdn: options.skipCdn,
+    });
   });
 
 program.parseAsync(process.argv).catch((error: unknown) => {

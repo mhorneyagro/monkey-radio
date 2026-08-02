@@ -229,17 +229,9 @@ export function trackExistsByExternalId(
   return row !== undefined;
 }
 
-export function deleteTemporaryReadyTracks(db: MonkeyRadioDb): number {
-  const rows = db
-    .prepare(
-      `SELECT id, file_path FROM tracks
-       WHERE status = 'ready' AND json_extract(mood_tags, '$.temporary') = 1`,
-    )
-    .all() as Array<{ id: string; file_path: string | null }>;
+export function deleteTracksByIds(db: MonkeyRadioDb, ids: string[]): number {
+  if (ids.length === 0) return 0;
 
-  if (rows.length === 0) return 0;
-
-  const ids = rows.map((row) => row.id);
   const placeholders = ids.map(() => "?").join(", ");
 
   db.prepare(`DELETE FROM playback_log WHERE track_id IN (${placeholders})`).run(
@@ -259,7 +251,23 @@ export function deleteTemporaryReadyTracks(db: MonkeyRadioDb): number {
   ).run(...ids);
   db.prepare(`DELETE FROM tracks WHERE id IN (${placeholders})`).run(...ids);
 
-  return rows.length;
+  return ids.length;
+}
+
+export function deleteTemporaryReadyTracks(db: MonkeyRadioDb): number {
+  const rows = db
+    .prepare(
+      `SELECT id, file_path FROM tracks
+       WHERE status = 'ready' AND json_extract(mood_tags, '$.temporary') = 1`,
+    )
+    .all() as Array<{ id: string; file_path: string | null }>;
+
+  if (rows.length === 0) return 0;
+
+  return deleteTracksByIds(
+    db,
+    rows.map((row) => row.id),
+  );
 }
 
 export function deleteNonUserReadyTracks(db: MonkeyRadioDb): number {
@@ -273,27 +281,21 @@ export function deleteNonUserReadyTracks(db: MonkeyRadioDb): number {
 
   if (rows.length === 0) return 0;
 
-  const ids = rows.map((row) => row.id);
-  const placeholders = ids.map(() => "?").join(", ");
-
-  db.prepare(`DELETE FROM playback_log WHERE track_id IN (${placeholders})`).run(
-    ...ids,
+  return deleteTracksByIds(
+    db,
+    rows.map((row) => row.id),
   );
-  db.prepare(`DELETE FROM generation_jobs WHERE track_id IN (${placeholders})`).run(
-    ...ids,
-  );
-  db.prepare(
-    `UPDATE dj_segments SET track_before = NULL WHERE track_before IN (${placeholders})`,
-  ).run(...ids);
-  db.prepare(
-    `UPDATE dj_segments SET track_after = NULL WHERE track_after IN (${placeholders})`,
-  ).run(...ids);
-  db.prepare(
-    `UPDATE broadcast_state SET current_track_id = NULL WHERE current_track_id IN (${placeholders})`,
-  ).run(...ids);
-  db.prepare(`DELETE FROM tracks WHERE id IN (${placeholders})`).run(...ids);
+}
 
-  return rows.length;
+export function findTracksByTitle(db: MonkeyRadioDb, query: string): Track[] {
+  const pattern = `%${query.trim()}%`;
+  return db
+    .prepare(
+      `SELECT * FROM tracks
+       WHERE title LIKE ? OR display_name LIKE ? OR search_text LIKE ?
+       ORDER BY title`,
+    )
+    .all(pattern, pattern, pattern) as Track[];
 }
 
 export function insertGenerationJob(

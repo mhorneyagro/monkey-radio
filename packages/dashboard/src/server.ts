@@ -1,13 +1,15 @@
 import { config } from "dotenv";
 import { randomUUID } from "node:crypto";
 import express from "express";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, statSync, unlinkSync } from "node:fs";
 import { Readable } from "node:stream";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   checkLibraryHealth,
   cdnObjectUrl,
+  deleteTracksByIds,
+  findTracksByTitle,
   getBroadcastPlayback,
   getRecentDjSegments,
   getRecentPlaybackWithTracks,
@@ -26,6 +28,7 @@ import {
   resolveDjAbsolutePath,
   resolveTrackAbsolutePath,
   resolveTrackAudioUrl,
+  storageObjectKey,
   skipTargetOffsetMs,
   trackDurationMs,
   trackStartIsoForOffset,
@@ -393,6 +396,93 @@ async function proxyCdnAudio(
     res,
   );
 }
+
+app.post("/api/admin/tracks/remove", requireAdmin, async (req, res) => {
+  const trackId =
+    typeof req.body?.id === "string" && req.body.id.trim()
+      ? req.body.id.trim()
+      : undefined;
+  const titleQuery =
+    typeof req.body?.title === "string" && req.body.title.trim()
+      ? req.body.title.trim()
+      : undefined;
+
+  if (!trackId && !titleQuery) {
+    res.status(400).json({ error: "Provide id or title in request body" });
+    return;
+  }
+
+  const tracks = trackId
+    ? (() => {
+        const track = getTrackById(db, trackId);
+        return track ? [track] : [];
+      })()
+    : findTracksByTitle(db, titleQuery!);
+
+  if (tracks.length === 0) {
+    res.status(404).json({ error: "Track not found" });
+    return;
+  }
+
+  const removed = deleteTracksByIds(
+    db,
+    tracks.map((track) => track.id),
+  );
+
+  const deletedFiles: string[] = [];
+  for (const track of tracks) {
+    if (!track.file_path) continue;
+
+    const absolutePath = resolveTrackAbsolutePath(
+      libraryConfig.libraryPath,
+      track.file_path,
+    );
+    if (existsSync(absolutePath)) {
+      unlinkSync(absolutePath);
+      deletedFiles.push(absolutePath);
+    }
+
+    if (libraryConfig.libraryCdnUrl && process.env.R2_BUCKET && process.env.R2_ENDPOINT) {
+      const key = storageObjectKey(track.file_path);
+      try {
+        const { spawn } = await import("node:child_process");
+        await new Promise<void>((resolve, reject) => {
+          const proc = spawn(
+            "aws",
+            [
+              "s3",
+              "rm",
+              `s3://${process.env.R2_BUCKET}/${key}`,
+              "--endpoint-url",
+              process.env.R2_ENDPOINT!,
+              "--region",
+              "auto",
+            ],
+            { stdio: "ignore" },
+          );
+          proc.on("error", reject);
+          proc.on("exit", (code) => {
+            if (code === 0) resolve();
+            else reject(new Error(`aws s3 rm exited with code ${code}`));
+          });
+        });
+      } catch {
+        // CDN object may already be gone
+      }
+    }
+  }
+
+  res.json({
+    ok: true,
+    removed,
+    tracks: tracks.map((track) => ({
+      id: track.id,
+      title: track.display_name ?? track.title,
+      genre: track.genre,
+    })),
+    deletedFiles,
+  });
+});
 
 app.get("/api/broadcast/now-playing", (req, res) => {
   const preferLocal = req.query.audioOrigin === "local";

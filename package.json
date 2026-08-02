@@ -42,6 +42,7 @@
     "production:down": "docker compose -f docker-compose.prod.yml down",
     "production:logs": "docker compose -f docker-compose.prod.yml logs -f",
     "library:sync-cdn": "bash scripts/sync-library-to-r2.sh",
+    "library:remove-track": "npm run remove-track -w library-worker --",
     "db:backup-r2": "bash scripts/backup-db-to-r2.sh",
     "production:prepare": "bash scripts/prepare-production.sh",
     "render:env": "bash scripts/build-render-env.sh",
