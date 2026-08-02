@@ -16,9 +16,15 @@ COPY package.json package-lock.json tsconfig.base.json tsconfig.build.json ./
 COPY packages ./packages
 
 # Skip lifecycle scripts (library-worker playwright download); build explicitly below
-RUN npm ci --include=dev --ignore-scripts
+RUN npm ci --include=dev --ignore-scripts \
+ && mkdir -p node_modules/@monkey-radio \
+ && ln -sfn ../../packages/shared node_modules/@monkey-radio/shared \
+ && test -f node_modules/@monkey-radio/shared/package.json
 
-RUN npx tsc -b tsconfig.build.json
+RUN ./node_modules/.bin/tsc -b packages/shared \
+ && ./node_modules/.bin/tsc -b packages/broadcast-worker \
+ && ./node_modules/.bin/tsc -b packages/dashboard \
+ && ./node_modules/.bin/tsc -b packages/stream-worker
 
 # Runtime image with ffmpeg, Xvfb, PulseAudio, Playwright Chromium
 FROM node:20-bookworm
