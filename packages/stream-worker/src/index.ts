@@ -155,7 +155,6 @@ async function launchBrowser(
     await page.goto(canvasUrl, { waitUntil: "networkidle" });
   }
 
-  await page.emulateMedia({ muted: false });
   await page.bringToFront();
 
   // Wait for stream-ready signal from canvas
