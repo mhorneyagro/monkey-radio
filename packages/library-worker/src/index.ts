@@ -52,6 +52,10 @@ import {
   transitionBroadcastToLive,
   updateLiveBroadcast,
 } from "./youtube/live.js";
+import {
+  DEFAULT_LIVE_DESCRIPTION,
+  DEFAULT_LIVE_TITLE,
+} from "./youtube/live-metadata.js";
 
 const program = new Command();
 
@@ -240,11 +244,6 @@ program
     console.log("\nAdd this to your .env:\n");
     console.log(`YOUTUBE_REFRESH_TOKEN=${refreshToken}\n`);
   });
-
-const DEFAULT_LIVE_TITLE =
-  "🔴 24/7 Lofi & Chill Radio Live | Beats to Study, Relax & Sleep";
-const DEFAULT_LIVE_DESCRIPTION =
-  "Non-stop live music 24/7 — lofi, jazz, ambient, rock & synthwave. Perfect for studying, working, relaxing, or sleeping. Chat with DJ Monkey and request your vibe! 🎧";
 
 program
   .command("youtube-live-create")
