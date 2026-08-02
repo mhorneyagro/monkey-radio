@@ -44,24 +44,24 @@ start_pulseaudio() {
 
   export PULSE_SERVER="unix:${PULSE_RUNTIME}/pulse/native"
 
-  if gosu "$PULSE_USER" XDG_RUNTIME_DIR="$PULSE_RUNTIME" pactl info >/dev/null 2>&1; then
+  if gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" pactl info >/dev/null 2>&1; then
     echo "[entrypoint] PulseAudio already running"
     return 0
   fi
 
-  gosu "$PULSE_USER" XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
+  gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
     pulseaudio --daemonize --exit-idle-time=-1 --disallow-exit --log-target=stderr
 
   sleep 2
 
-  if ! gosu "$PULSE_USER" XDG_RUNTIME_DIR="$PULSE_RUNTIME" pactl info >/dev/null 2>&1; then
+  if ! gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" pactl info >/dev/null 2>&1; then
     echo "[entrypoint] PulseAudio failed to start"
     return 1
   fi
 
-  gosu "$PULSE_USER" XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
+  gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
     pactl load-module module-null-sink sink_name=stream_sink sink_properties=device.description=StreamSink
-  gosu "$PULSE_USER" XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
+  gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
     pactl set-default-sink stream_sink
 
   echo "[entrypoint] PulseAudio ready (stream_sink at $PULSE_SERVER)"
