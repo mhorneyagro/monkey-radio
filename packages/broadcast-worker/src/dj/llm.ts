@@ -288,19 +288,25 @@ function mockDjScript(params: {
   const request = extractLatestChatRequest(params.chatMessages);
   const lastTitle = params.lastTrack.display_name ?? params.lastTrack.title ?? "that track";
   const nextTitle = params.nextTrack.display_name ?? params.nextTrack.title ?? "something fresh";
+  const musicBit = `That was ${lastTitle}. Up next: ${nextTitle}.`;
 
   if (request && chatRequestMatchesNextTrack(params.chatMessages, params.nextTrack)) {
     const ack = shoutout
       ? `${shoutout.username}, heard you — `
-      : `${request.username} wanted ${request.style} — `;
-    return `${ack}that was ${lastTitle}. Up next: ${nextTitle}. Monkey Radio.`;
+      : `${request.username}, got your request — `;
+    return `${ack}${musicBit} Monkey Radio.`;
   }
 
   if (shoutout) {
-    return `Shoutout ${shoutout.username}. That was ${lastTitle} — up next, ${nextTitle}. Monkey Radio.`;
+    return `${musicBit} Hey ${shoutout.username} — thanks for tuning in. Monkey Radio.`;
   }
 
-  return `That was ${lastTitle}. Up next: ${nextTitle}. Monkey Radio.`;
+  if (params.chatMessages.length > 0) {
+    const latest = params.chatMessages[params.chatMessages.length - 1];
+    return `${musicBit} ${latest.username}, appreciate you in the chat. Monkey Radio.`;
+  }
+
+  return `${musicBit} Monkey Radio.`;
 }
 
 const MAX_DJ_WORDS = 45;
@@ -324,35 +330,38 @@ export async function writeDjScript(
     return mockDjScript(params);
   }
 
-  const system = `You are DJ Monkey on Monkey Radio — a quick voice break between songs. Short, warm, a little playful.
+  const system = `You are DJ Monkey on Monkey Radio — a quick voice break between songs.
 
 Write ~10–15 seconds of spoken copy (max 45 words). One or two sentences.
 
-You MUST:
-- Briefly nod to the track that just played
-- Name the next track
-- If shoutouts is non-empty, say at least one viewer's username out loud (e.g. "hey nightowl_42" or "shoutout JazzCat")
-- If genreReason or recentChat shows someone requested a song/style, acknowledge them by username and confirm you're playing it (e.g. "you asked for celtic — here we go")
-- Do not ignore chat when shoutouts or recentChat are provided
+Music (keep it minimal — do not linger on music):
+- Briefly name the track that just ended (lastTitle)
+- Briefly name the next track (nextTitle)
+- Do NOT discuss genres, moods, vibes, instruments, BPM, production, or why songs were chosen
+- Do NOT describe how the music sounds or feels
 
-Use genreReason, shoutouts, and recentChat together. Speak directly to viewers, not about them in the third person.
+Chat (this is where most of your personality goes):
+- If recentChat or shoutouts are present, spend most of your words engaging viewers
+- Say usernames out loud — react to what they said, answer questions, shout people out
+- If someone requested a song/style and you're playing it next, briefly confirm by username
+- Speak directly to viewers in the second person, not about them in the third person
 
-Skip filler and long transitions. No stage directions — spoken words only.
+When chat is quiet:
+- Keep it very short: last song, next song, sign off
+- No filler, no music commentary, no fake enthusiasm about the tracks
+
+No stage directions. Spoken words only.
 Return JSON: { "script": "..." }`;
 
   const user = JSON.stringify({
     lastTitle: params.lastTrack.display_name ?? params.lastTrack.title,
-    lastStyle: params.lastTrack.llm_genre ?? params.lastTrack.genre,
     nextTitle: params.nextTrack.display_name ?? params.nextTrack.title,
-    nextStyle: params.nextTrack.llm_genre ?? params.nextTrack.genre,
-    mood: params.mood.mood,
-    genreReason: params.mood.genreReason,
-    trackHints: params.mood.trackHints,
     shoutouts: params.mood.shoutouts.slice(0, 2),
     recentChat: params.chatMessages.slice(-8).map((message) => ({
       username: message.username,
       message: message.message,
     })),
+    chatIsActive: params.chatMessages.length > 0,
   });
 
   const raw = await chatCompletion(config, system, user, 120);
