@@ -8,6 +8,7 @@ import { applyRootLogo } from "./logo.js";
 import {
   extractMoodState,
   updateNowPlayingStrip,
+  updateSongLinkStrip,
 } from "./now-playing-strip.js";
 
 const canvas = document.getElementById("viz");
@@ -15,6 +16,7 @@ const trackAudio = document.getElementById("audio");
 const djAudio = document.getElementById("dj-audio");
 const logoGlow = document.getElementById("logo-glow");
 const nowPlayingStrip = document.getElementById("now-playing-strip");
+const songLinkStrip = document.getElementById("song-link-strip");
 const container = document.querySelector(".youtube-canvas");
 
 void applyRootLogo(document.querySelector(".logo"), "chrome");
@@ -58,6 +60,7 @@ async function refreshNowPlaying() {
   const data = await response.json();
 
   updateNowPlayingStrip(nowPlayingStrip, data);
+  updateSongLinkStrip(songLinkStrip, data);
   visualizer.setMood(extractMoodState(data));
 
   if (!data.playing) return;

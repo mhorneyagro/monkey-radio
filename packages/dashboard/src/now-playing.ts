@@ -42,6 +42,7 @@ function buildUpcomingTrack(
     genre: track.genre,
     durationSec: track.duration_sec,
     audioUrl: resolveTrackAudioUrl(trackId, track.file_path, libraryCdnUrl),
+    youtubeUrl: track.youtube_url ?? null,
   };
 }
 
@@ -93,6 +94,7 @@ export function buildNowPlayingResponse(
             outgoingTrack.file_path,
             libraryCdnUrl,
           ),
+          youtubeUrl: outgoingTrack.youtube_url ?? null,
           fadeOutSec,
           fadeStartedAt,
         };
@@ -160,6 +162,7 @@ export function buildNowPlayingResponse(
       genre: track.genre,
       durationSec: track.duration_sec,
       startedAt: state.track_started_at,
+      youtubeUrl: track.youtube_url ?? null,
     },
     djSegment: null,
     upcomingDj,

@@ -8,6 +8,7 @@ import {
   updateBroadcastState,
 } from "@monkey-radio/shared";
 import type { ChatBuffer } from "./chat/buffer.js";
+import { announceTrackInLiveChat } from "./chat/track-announcer.js";
 import { generateDjSegment, type DjPipelineResult } from "./dj/pipeline.js";
 import { selectNextTrack, trackStyle } from "./playlist/selector.js";
 
@@ -178,6 +179,8 @@ async function playTrack(
   console.log(
     `[now playing] ${track.genre} — ${track.title ?? track.id} (${track.duration_sec ?? "?"}s)`,
   );
+
+  void announceTrackInLiveChat(config, track);
 
   if (!scheduleDj) {
     while (Date.now() - trackStartMs(db, startedAt) < durationMs) {
