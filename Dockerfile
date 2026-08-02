@@ -19,9 +19,10 @@ COPY packages ./packages
 RUN npm ci --include=dev --ignore-scripts \
  && mkdir -p node_modules/@monkey-radio \
  && ln -sfn ../../packages/shared node_modules/@monkey-radio/shared \
+ && test -f node_modules/.bin/tsc \
  && test -f node_modules/@monkey-radio/shared/package.json
 
-RUN ./node_modules/.bin/tsc -b packages/shared \
+RUN npm run build -w @monkey-radio/shared \
  && test -f packages/shared/dist/index.d.ts
 
 RUN npm run build -w broadcast-worker \

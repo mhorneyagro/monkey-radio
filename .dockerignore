@@ -8,4 +8,5 @@ data
 *.db-journal
 __pycache__
 *.tsbuildinfo
+packages/**/dist
 infra/suno-api/upstream
