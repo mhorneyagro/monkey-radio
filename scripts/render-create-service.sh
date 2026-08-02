@@ -61,6 +61,10 @@ DEFAULTS=(
 )
 
 for pair in "${DEFAULTS[@]}"; do
+  key="${pair%%=*}"
+  if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+    continue
+  fi
   ARGS+=(--env-var "$pair")
 done
 

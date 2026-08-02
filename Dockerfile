@@ -4,18 +4,18 @@ FROM node:20-bookworm AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/broadcast-worker/package.json ./packages/broadcast-worker/
-COPY packages/dashboard/package.json ./packages/dashboard/
-COPY packages/library-worker/package.json ./packages/library-worker/
-COPY packages/stream-worker/package.json ./packages/stream-worker/
-
-RUN npm ci --ignore-scripts
-
 COPY tsconfig.base.json ./
-COPY packages ./packages
+COPY packages/shared ./packages/shared
+COPY packages/broadcast-worker ./packages/broadcast-worker
+COPY packages/dashboard ./packages/dashboard
+COPY packages/stream-worker ./packages/stream-worker
 
-RUN npm run build
+RUN npm ci --workspace @monkey-radio/shared --workspace broadcast-worker --workspace @monkey-radio/dashboard --workspace stream-worker
+
+RUN npm run build -w @monkey-radio/shared \
+ && npm run build -w broadcast-worker \
+ && npm run build -w @monkey-radio/dashboard \
+ && npm run build -w stream-worker
 
 # Runtime image with ffmpeg, Xvfb, PulseAudio, Playwright Chromium
 FROM node:20-bookworm
@@ -39,7 +39,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/packages/broadcast-worker ./packages/broadcast-worker
+COPY --from=builder /app/packages/dashboard ./packages/dashboard
+COPY --from=builder /app/packages/stream-worker ./packages/stream-worker
 COPY package.json ./
 COPY tsconfig.base.json ./
 COPY assets ./assets
@@ -54,7 +57,7 @@ ENV PULSE_SERVER=unix:/tmp/pulse/native
 
 VOLUME ["/app/data"]
 
-EXPOSE 5400
+EXPOSE 10000
 
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
