@@ -11,7 +11,7 @@ export function createVisualizer({ canvas, audio, logoGlow, container, audioHook
     throw new Error("Could not create 2D canvas context");
   }
 
-  const BAR_COUNT = 96;
+  const BAR_COUNT = window.__STREAM_LITE__ ? 48 : 96;
   let width = 0;
   let height = 0;
   let centerX = 0;
@@ -134,6 +134,7 @@ export function createVisualizer({ canvas, audio, logoGlow, container, audioHook
   }
 
   function spawnParticles(intensity) {
+    if (window.__STREAM_LITE__) return;
     const count = Math.floor(4 + intensity * 14);
     for (let i = 0; i < count; i += 1) {
       particles.push({
@@ -264,6 +265,7 @@ export function createVisualizer({ canvas, audio, logoGlow, container, audioHook
   }
 
   function drawParticles() {
+    if (window.__STREAM_LITE__) return;
     particles = particles.filter((particle) => particle.life > 0);
 
     for (const particle of particles) {

@@ -29,6 +29,7 @@ const visualizer = createVisualizer({
 });
 
 window.__STREAM_READY__ = false;
+window.__STREAM_LITE__ = true;
 
 function unmuteAudioElements() {
   for (const el of [trackAudio, djAudio]) {

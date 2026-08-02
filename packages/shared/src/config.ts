@@ -209,12 +209,13 @@ const streamWorkerConfigSchema = z.object({
   youtubeStreamKey: z.string().optional(),
   display: z.string().default(":99"),
   pulseMonitorSource: z.string().default("stream_sink.monitor"),
-  width: z.coerce.number().int().positive().default(1920),
-  height: z.coerce.number().int().positive().default(1080),
-  frameRate: z.coerce.number().int().positive().default(30),
-  videoBitrate: z.string().default("4500k"),
-  audioBitrate: z.string().default("192k"),
-  videoPreset: z.string().default("faster"),
+  width: z.coerce.number().int().positive().default(1280),
+  height: z.coerce.number().int().positive().default(720),
+  frameRate: z.coerce.number().int().positive().default(24),
+  videoBitrate: z.string().default("2500k"),
+  audioBitrate: z.string().default("128k"),
+  videoPreset: z.string().default("ultrafast"),
+  videoThreads: z.coerce.number().int().positive().default(2),
 });
 
 export type StreamWorkerConfig = z.infer<typeof streamWorkerConfigSchema>;
@@ -234,6 +235,7 @@ export function loadStreamWorkerConfig(
     videoBitrate: env.STREAM_VIDEO_BITRATE,
     audioBitrate: env.STREAM_AUDIO_BITRATE,
     videoPreset: env.STREAM_VIDEO_PRESET,
+    videoThreads: env.STREAM_VIDEO_THREADS,
   });
 }
 

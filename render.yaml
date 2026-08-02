@@ -40,6 +40,20 @@ envVarGroups:
         value: ":99"
       - key: STREAM_PULSE_MONITOR
         value: stream_sink.monitor
+      - key: STREAM_WIDTH
+        value: "1280"
+      - key: STREAM_HEIGHT
+        value: "720"
+      - key: STREAM_FRAME_RATE
+        value: "24"
+      - key: STREAM_VIDEO_BITRATE
+        value: 2500k
+      - key: STREAM_AUDIO_BITRATE
+        value: 128k
+      - key: STREAM_VIDEO_PRESET
+        value: ultrafast
+      - key: STREAM_VIDEO_THREADS
+        value: "2"
       - key: DATABASE_PATH
         value: /app/data/monkey-radio.db
       - key: LIBRARY_PATH

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { config } from "dotenv";
 import { spawn, type ChildProcess } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type BrowserContext, type Page } from "playwright";
@@ -9,23 +11,29 @@ import {
   resolveStreamConfigPaths,
 } from "@monkey-radio/shared";
 
+const execFileAsync = promisify(execFile);
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
 config({ path: resolve(repoRoot, ".env"), override: true });
 
-const CHROMIUM_ARGS = [
-  "--autoplay-policy=no-user-gesture-required",
-  "--disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayTypes",
-  "--no-sandbox",
-  "--disable-dev-shm-usage",
-  "--window-size=1920,1080",
-  "--window-position=0,0",
-  "--hide-scrollbars",
-  "--disable-infobars",
-  "--disable-session-crashed-bubble",
-  "--force-device-scale-factor=1",
-  "--disable-gpu",
-];
+function buildChromiumArgs(width: number, height: number): string[] {
+  return [
+    "--autoplay-policy=no-user-gesture-required",
+    "--disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayTypes",
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    `--window-size=${width},${height}`,
+    "--window-position=0,0",
+    "--hide-scrollbars",
+    "--disable-infobars",
+    "--disable-session-crashed-bubble",
+    "--force-device-scale-factor=1",
+    "--disable-gpu",
+    "--disable-renderer-backgrounding",
+    "--disable-background-timer-throttling",
+  ];
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -47,10 +55,33 @@ async function waitForDashboard(url: string, timeoutMs = 120_000): Promise<void>
   throw new Error(`Dashboard not reachable at ${url} after ${timeoutMs}ms`);
 }
 
+async function waitForDisplay(display: string, timeoutMs = 60_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await execFileAsync("xdpyinfo", ["-display", display], {
+        timeout: 5000,
+      });
+      return;
+    } catch {
+      await sleep(1000);
+    }
+  }
+  throw new Error(`X display ${display} not ready after ${timeoutMs}ms`);
+}
+
 function buildRtmpUrl(baseUrl: string, streamKey: string): string {
   const trimmed = baseUrl.replace(/\/+$/, "");
   const key = streamKey.replace(/^\/+/, "");
   return `${trimmed}/${key}`;
+}
+
+function parseBitrateKbps(value: string): number {
+  const match = /^(\d+(?:\.\d+)?)\s*([kKmM])?/.exec(value.trim());
+  if (!match) return 2500;
+  const amount = Number(match[1]);
+  const unit = (match[2] ?? "k").toLowerCase();
+  return unit === "m" ? amount * 1000 : amount;
 }
 
 function spawnFfmpeg(
@@ -59,17 +90,16 @@ function spawnFfmpeg(
   rtmpUrl: string,
 ): ChildProcess {
   const pulseSource = config.pulseMonitorSource;
+  const videoBufKbps = parseBitrateKbps(config.videoBitrate) * 2;
 
   const args = [
     "-y",
     "-thread_queue_size",
-    "1024",
+    "2048",
     "-f",
     "x11grab",
     "-draw_mouse",
     "0",
-    "-use_wallclock_as_timestamps",
-    "1",
     "-framerate",
     String(config.frameRate),
     "-video_size",
@@ -77,7 +107,7 @@ function spawnFfmpeg(
     "-i",
     `${display}.0+0,0`,
     "-thread_queue_size",
-    "1024",
+    "2048",
     "-f",
     "pulse",
     "-sample_rate",
@@ -90,6 +120,8 @@ function spawnFfmpeg(
     "libx264",
     "-preset",
     config.videoPreset,
+    "-threads",
+    String(config.videoThreads),
     "-pix_fmt",
     "yuv420p",
     "-b:v",
@@ -97,12 +129,12 @@ function spawnFfmpeg(
     "-maxrate",
     config.videoBitrate,
     "-bufsize",
-    "9000k",
+    `${videoBufKbps}k`,
     "-g",
     String(config.frameRate * 2),
     "-r",
     String(config.frameRate),
-    "-vsync",
+    "-fps_mode",
     "cfr",
     "-c:a",
     "aac",
@@ -110,14 +142,15 @@ function spawnFfmpeg(
     config.audioBitrate,
     "-ar",
     "48000",
-    "-async",
-    "1",
     "-f",
     "flv",
     rtmpUrl,
   ];
 
-  console.log("[stream] Starting ffmpeg → YouTube RTMP");
+  console.log(
+    `[stream] Starting ffmpeg → YouTube RTMP (${config.width}x${config.height}@${config.frameRate}, ` +
+      `${config.videoPreset}, ${config.videoThreads} threads)`,
+  );
   const proc = spawn("ffmpeg", args, {
     stdio: ["ignore", "pipe", "pipe"],
     env: {
@@ -145,14 +178,18 @@ function spawnFfmpeg(
 async function launchBrowser(
   dashboardUrl: string,
   display: string,
+  width: number,
+  height: number,
 ): Promise<{ context: BrowserContext; page: Page }> {
   const canvasUrl = `${dashboardUrl.replace(/\/+$/, "")}/canvas/stream`;
   console.log(`[stream] Opening ${canvasUrl} (app mode)`);
 
+  await waitForDisplay(display);
+
   const context = await chromium.launchPersistentContext("/tmp/chromium-stream", {
     headless: false,
-    args: [...CHROMIUM_ARGS, `--app=${canvasUrl}`],
-    viewport: { width: 1920, height: 1080 },
+    args: [...buildChromiumArgs(width, height), `--app=${canvasUrl}`],
+    viewport: { width, height },
     ignoreDefaultArgs: ["--enable-automation"],
     env: {
       ...process.env,
@@ -225,7 +262,12 @@ async function runStreamLoop(): Promise<void> {
 
   async function start(): Promise<void> {
     await cleanup();
-    const launched = await launchBrowser(dashboardUrl, display);
+    const launched = await launchBrowser(
+      dashboardUrl,
+      display,
+      streamConfig.width,
+      streamConfig.height,
+    );
     context = launched.context;
     ffmpeg = spawnFfmpeg(streamConfig, display, rtmpUrl);
 
@@ -273,7 +315,16 @@ const command = process.argv[2];
 if (command === "start" || !command) {
   runStreamLoop().catch((error) => {
     console.error("[stream] Fatal:", error instanceof Error ? error.message : error);
-    process.exit(1);
+    console.warn("[stream] Retrying in 10s…");
+    setTimeout(() => {
+      runStreamLoop().catch((retryError) => {
+        console.error(
+          "[stream] Fatal (retry):",
+          retryError instanceof Error ? retryError.message : retryError,
+        );
+        process.exit(1);
+      });
+    }, 10_000);
   });
 } else {
   console.error(`Unknown command: ${command}`);

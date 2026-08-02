@@ -62,7 +62,7 @@ start_pulseaudio() {
   gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
     pactl load-module module-null-sink sink_name=stream_sink sink_properties=device.description=StreamSink
   gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
-    pactl set-sink-latency stream_sink 50000
+    pactl set-sink-latency stream_sink 100000
   gosu "$PULSE_USER" env XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
     pactl set-default-sink stream_sink
 
@@ -76,9 +76,19 @@ start_xvfb() {
   fi
 
   export DISPLAY="${DISPLAY:-:99}"
-  Xvfb "$DISPLAY" -screen 0 1920x1080x24 -ac +extension GLX +render -noreset &
-  sleep 2
-  echo "[entrypoint] Xvfb started on $DISPLAY"
+  local width="${STREAM_WIDTH:-1280}"
+  local height="${STREAM_HEIGHT:-720}"
+  Xvfb "$DISPLAY" -screen 0 "${width}x${height}x24" -ac +extension GLX +render -noreset &
+  local attempts=0
+  until xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge 30 ]; then
+      echo "[entrypoint] Xvfb failed to start on $DISPLAY"
+      return 1
+    fi
+    sleep 1
+  done
+  echo "[entrypoint] Xvfb started on $DISPLAY (${width}x${height})"
 }
 
 wait_for_dashboard() {
@@ -109,7 +119,13 @@ run_stream_worker() {
   echo "[entrypoint] Starting stream worker…"
   export HOME="/home/$PULSE_USER"
   export XDG_RUNTIME_DIR="$PULSE_RUNTIME"
-  gosu "$PULSE_USER" npm run stream:start &
+  export DISPLAY="${DISPLAY:-:99}"
+  gosu "$PULSE_USER" env \
+    DISPLAY="$DISPLAY" \
+    PULSE_SERVER="${PULSE_SERVER:-}" \
+    XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
+    HOME="/home/$PULSE_USER" \
+    npm run stream:start &
 }
 
 run_stream() {
@@ -142,7 +158,12 @@ case "$SERVICE" in
     wait_for_dashboard
     export HOME="/home/$PULSE_USER"
     export XDG_RUNTIME_DIR="$PULSE_RUNTIME"
-    exec gosu "$PULSE_USER" npm run stream:start
+    exec gosu "$PULSE_USER" env \
+      DISPLAY="${DISPLAY:-:99}" \
+      PULSE_SERVER="${PULSE_SERVER:-}" \
+      XDG_RUNTIME_DIR="$PULSE_RUNTIME" \
+      HOME="/home/$PULSE_USER" \
+      npm run stream:start
     ;;
   all)
     restore_database
