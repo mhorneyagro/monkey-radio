@@ -77,6 +77,7 @@ export async function announceTrackInLiveChat(
   let didSomething = false;
 
   if (
+    config.youtubeAnnounceTracksInChat &&
     config.chatProvider === "youtube" &&
     config.youtubeVideoId &&
     config.youtubeApiKey
@@ -107,7 +108,7 @@ export async function announceTrackInLiveChat(
   }
 
   const broadcastId = process.env.YOUTUBE_BROADCAST_ID;
-  if (broadcastId) {
+  if (broadcastId && config.youtubeUpdateLiveDescription) {
     try {
       await updateLiveBroadcastNowPlaying(auth, broadcastId, track);
       console.log(`[chat] updated live description for "${title}"`);

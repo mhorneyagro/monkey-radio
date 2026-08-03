@@ -117,9 +117,17 @@ const broadcastWorkerConfigSchema = z.object({
   youtubeVideoId: z.string().optional(),
   youtubeApiKey: z.string().optional(),
   chatProvider: z.enum(["mock", "youtube", "none"]).default("mock"),
-  chatPollIntervalMs: z.coerce.number().int().positive().default(5000),
+  chatPollIntervalMs: z.coerce.number().int().positive().default(15_000),
   chatWindowMs: z.coerce.number().int().positive().default(300_000),
   chatIgnoreUsernames: z.string().optional(),
+  youtubeAnnounceTracksInChat: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  youtubeUpdateLiveDescription: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
   minTracksBeforeDj: z.coerce.number().int().positive().default(1),
   djMinIntervalSec: z.coerce.number().int().positive().default(120),
   djPrepLeadSec: z.coerce.number().int().positive().default(30),
@@ -161,6 +169,8 @@ export function loadBroadcastWorkerConfig(
     chatPollIntervalMs: env.CHAT_POLL_INTERVAL_MS,
     chatWindowMs: env.CHAT_WINDOW_MS,
     chatIgnoreUsernames: env.CHAT_IGNORE_USERNAMES,
+    youtubeAnnounceTracksInChat: env.YOUTUBE_ANNOUNCE_TRACKS_IN_CHAT,
+    youtubeUpdateLiveDescription: env.YOUTUBE_UPDATE_LIVE_DESCRIPTION,
     minTracksBeforeDj: env.MIN_TRACKS_BEFORE_DJ,
     djMinIntervalSec: env.DJ_MIN_INTERVAL_SEC,
     djPrepLeadSec: env.DJ_PREP_LEAD_SEC,

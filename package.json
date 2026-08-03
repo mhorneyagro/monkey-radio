@@ -29,6 +29,7 @@
     "analyze:audio": "python3 scripts/analyze-audio.py",
     "logo:process": "python3 scripts/process-logo.py",
     "logo:trace": "python3 scripts/trace-logo.py",
+    "thumbnail:generate": "node scripts/generate-thumbnail.mjs",
     "dashboard:dev": "npm run dev -w @monkey-radio/dashboard",
     "dashboard:start": "npm run start -w @monkey-radio/dashboard",
     "broadcast:start": "npm run build -w @monkey-radio/shared && npm run start -w broadcast-worker",

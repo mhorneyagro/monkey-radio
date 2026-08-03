@@ -48,6 +48,27 @@ export async function batchUpdateYouTubeVideos(
     const videoIds = [...trackByVideoId.keys()];
     console.log(`Found ${videoIds.length} published track video(s) in the library.`);
 
+    if (options.dryRun) {
+      let updated = 0;
+      for (const [, track] of trackByVideoId) {
+        const title = track.display_name ?? track.title ?? track.id;
+        const nextDescription = mergeRoyaltyFreeDescription("", track, {
+          liveStreamUrl: options.liveStreamUrl,
+        });
+        updated += 1;
+        console.log(`  [dry-run] would update: ${title}`);
+        console.log("            license → creativeCommon");
+        console.log(`            description → ${nextDescription.slice(0, 80)}…`);
+      }
+
+      return {
+        total: videoIds.length,
+        updated,
+        skipped: 0,
+        failed: 0,
+      };
+    }
+
     const videos = await fetchYouTubeVideos(auth, videoIds);
 
     let updated = 0;
@@ -74,16 +95,6 @@ export async function batchUpdateYouTubeVideos(
       if (!needsLicense && !needsDescription) {
         skipped += 1;
         console.log(`  · skip (already up to date): ${title}`);
-        continue;
-      }
-
-      if (options.dryRun) {
-        updated += 1;
-        console.log(`  [dry-run] would update: ${title}`);
-        if (needsLicense) console.log("            license → creativeCommon");
-        if (needsDescription) {
-          console.log(`            description → ${nextDescription.slice(0, 80)}…`);
-        }
         continue;
       }
 

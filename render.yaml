@@ -23,9 +23,13 @@ envVarGroups:
       - key: DJ_PREP_LEAD_SEC
         value: "45"
       - key: CHAT_POLL_INTERVAL_MS
-        value: "5000"
+        value: "15000"
       - key: CHAT_WINDOW_MS
         value: "300000"
+      - key: YOUTUBE_ANNOUNCE_TRACKS_IN_CHAT
+        value: "false"
+      - key: YOUTUBE_UPDATE_LIVE_DESCRIPTION
+        value: "false"
       - key: BROADCAST_STALE_SEC
         value: "300"
       - key: LLM_MODEL

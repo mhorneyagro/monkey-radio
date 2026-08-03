@@ -278,7 +278,7 @@ program
   .description(
     "Batch-set Creative Commons license and royalty-free descriptions on published track videos",
   )
-  .option("--dry-run", "Preview updates without calling YouTube")
+  .option("--dry-run", "Preview updates from local library data (no YouTube API calls)")
   .option("--limit <n>", "Max videos to update", "0")
   .option("--delay-ms <ms>", "Delay between API updates", "500")
   .option(

@@ -55,6 +55,7 @@ export function startChatPoller(
   let stopped = false;
   let pageToken: string | undefined;
   let liveChatId: string | undefined;
+  let nextPollMs = config.chatPollIntervalMs;
   const filterOptions = djChatFilterOptions(config);
 
   async function pollOnce(): Promise<void> {
@@ -79,6 +80,12 @@ export function startChatPoller(
         pageToken,
       );
       pageToken = result.nextPageToken;
+      if (result.pollingIntervalMillis) {
+        nextPollMs = Math.max(
+          config.chatPollIntervalMs,
+          result.pollingIntervalMillis,
+        );
+      }
 
       for (const message of result.messages) {
         if (
@@ -111,7 +118,7 @@ export function startChatPoller(
         const message = error instanceof Error ? error.message : String(error);
         console.warn(`[chat] poll failed: ${message}`);
       }
-      await sleep(config.chatPollIntervalMs);
+      await sleep(nextPollMs);
     }
   })();
 
@@ -158,6 +165,7 @@ async function fetchYouTubeChat(
     isChatOwner: boolean;
   }>;
   nextPageToken?: string;
+  pollingIntervalMillis?: number;
 }> {
   const url = new URL("https://www.googleapis.com/youtube/v3/liveChat/messages");
   url.searchParams.set("liveChatId", liveChatId);
@@ -171,6 +179,7 @@ async function fetchYouTubeChat(
   }
 
   const data = (await response.json()) as {
+    pollingIntervalMillis?: number;
     nextPageToken?: string;
     items?: Array<{
       id: string;
@@ -188,5 +197,9 @@ async function fetchYouTubeChat(
       isChatOwner: item.authorDetails?.isChatOwner === true,
     })) ?? [];
 
-  return { messages, nextPageToken: data.nextPageToken };
+  return {
+    messages,
+    nextPageToken: data.nextPageToken,
+    pollingIntervalMillis: data.pollingIntervalMillis,
+  };
 }
