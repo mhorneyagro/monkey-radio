@@ -253,7 +253,18 @@ Rules:
 
   const raw = await chatCompletion(config, system, user);
   const mood = parseMoodDecision(raw, params.currentStyle);
-  return enrichMoodFromChat(mood, params.chatMessages);
+  const enriched = enrichMoodFromChat(mood, params.chatMessages);
+
+  if (!extractLatestChatRequest(params.chatMessages)) {
+    return {
+      ...enriched,
+      nextStyle: undefined,
+      trackHints: undefined,
+      genreReason: enriched.genreReason ?? "No chat requests — random pick from the full library.",
+    };
+  }
+
+  return enriched;
 }
 
 function chatRequestMatchesNextTrack(
