@@ -32,6 +32,8 @@ envVarGroups:
         value: gpt-4o-mini
       - key: ELEVENLABS_MODEL
         value: eleven_turbo_v2_5
+      - key: ELEVENLABS_VOICE_ID
+        value: xUwWtrwxKYQAFNPrH25f
       - key: DASHBOARD_URL
         value: http://localhost:5400
       - key: DISPLAY
@@ -82,8 +84,6 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: ELEVENLABS_API_KEY
-        sync: false
-      - key: ELEVENLABS_VOICE_ID
         sync: false
       - key: LIBRARY_CDN_URL
         sync: false
