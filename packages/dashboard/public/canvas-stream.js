@@ -28,6 +28,32 @@ const visualizer = createVisualizer({
 window.__STREAM_READY__ = false;
 window.__STREAM_LITE__ = true;
 
+function measureStreamAudio() {
+  try {
+    const { analyser, audioContext } = playback.getAudioHook();
+    if (audioContext.state === "suspended") {
+      return { level: 0, playing: false, suspended: true };
+    }
+    const primary = playback.getPrimaryAudio();
+    if (primary.paused || primary.ended) {
+      return { level: 0, playing: false, suspended: false };
+    }
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    let sum = 0;
+    for (const value of data) sum += value;
+    return {
+      level: sum / data.length,
+      playing: true,
+      suspended: false,
+    };
+  } catch {
+    return { level: 0, playing: false, suspended: false };
+  }
+}
+
+window.__measureStreamAudio__ = measureStreamAudio;
+
 function unmuteAudioElements() {
   for (const el of [trackAudio, djAudio]) {
     el.muted = false;
@@ -98,11 +124,13 @@ async function keepAudioAlive() {
 
     const { audioContext } = playback.getAudioHook();
     const primary = playback.getPrimaryAudio();
+    const audio = measureStreamAudio();
     const stalled =
       primary.paused ||
       primary.ended ||
       audioContext.state === "suspended" ||
-      !playback.isPlaying();
+      !playback.isPlaying() ||
+      (data.phase === "track" && audio.playing && audio.level < 2);
 
     if (!stalled) return;
 
@@ -120,7 +148,7 @@ async function keepAudioAlive() {
 }
 
 // Chromium can suspend Web Audio after long runtime; recover without a full redeploy.
-setInterval(() => void keepAudioAlive(), 15_000);
+setInterval(() => void keepAudioAlive(), 5_000);
 
 // Retry autoplay until stream worker sees __STREAM_READY__
 const readyInterval = setInterval(async () => {

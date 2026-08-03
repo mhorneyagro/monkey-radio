@@ -204,6 +204,13 @@ async function launchBrowser(
 
   await page.bringToFront();
 
+  page.on("console", (msg) => {
+    const text = msg.text();
+    if (text.includes("[stream]")) {
+      console.log(`[canvas] ${text}`);
+    }
+  });
+
   // Wait for stream-ready signal from canvas
   await page.waitForFunction(
     () => (window as unknown as { __STREAM_READY__?: boolean }).__STREAM_READY__ === true,
@@ -219,6 +226,88 @@ async function launchBrowser(
 
   console.log("[stream] Canvas audio synced and ready");
   return { context, page };
+}
+
+interface StreamAudioProbe {
+  level: number;
+  playing: boolean;
+  suspended: boolean;
+}
+
+async function probeStreamAudio(page: Page): Promise<StreamAudioProbe> {
+  return page.evaluate(() => {
+    const measure = (
+      window as unknown as {
+        __measureStreamAudio__?: () => StreamAudioProbe;
+      }
+    ).__measureStreamAudio__;
+    return measure?.() ?? { level: 0, playing: false, suspended: false };
+  });
+}
+
+async function isBroadcastPlayingMusic(dashboardUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${dashboardUrl.replace(/\/+$/, "")}/api/broadcast/now-playing`,
+      { signal: AbortSignal.timeout(5000) },
+    );
+    if (!response.ok) return false;
+    const data = (await response.json()) as { playing?: boolean; phase?: string };
+    return data.playing === true && data.phase === "track";
+  } catch {
+    return false;
+  }
+}
+
+function startAudioHealthMonitor(
+  getPage: () => Page | null,
+  dashboardUrl: string,
+  onSilent: () => void,
+): void {
+  const SILENT_LEVEL = 2;
+  const SILENT_STREAK_LIMIT = 3;
+  const CHECK_INTERVAL_MS = 20_000;
+  let silentStreak = 0;
+
+  void (async () => {
+    while (true) {
+      await sleep(CHECK_INTERVAL_MS);
+      const page = getPage();
+      if (!page) {
+        silentStreak = 0;
+        continue;
+      }
+
+      try {
+        const shouldHaveMusic = await isBroadcastPlayingMusic(dashboardUrl);
+        if (!shouldHaveMusic) {
+          silentStreak = 0;
+          continue;
+        }
+
+        const audio = await probeStreamAudio(page);
+        if (audio.level >= SILENT_LEVEL) {
+          silentStreak = 0;
+          continue;
+        }
+
+        silentStreak += 1;
+        console.warn(
+          `[stream] silent audio (${silentStreak}/${SILENT_STREAK_LIMIT}, ` +
+            `level=${audio.level.toFixed(1)}, suspended=${audio.suspended})`,
+        );
+
+        if (silentStreak >= SILENT_STREAK_LIMIT) {
+          silentStreak = 0;
+          onSilent();
+          return;
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[stream] audio health check failed: ${message}`);
+      }
+    }
+  })();
 }
 
 async function runStreamLoop(): Promise<void> {
@@ -241,6 +330,7 @@ async function runStreamLoop(): Promise<void> {
 
   const display = streamConfig.display;
   let context: BrowserContext | null = null;
+  let page: Page | null = null;
   let ffmpeg: ChildProcess | null = null;
   let restarting = false;
 
@@ -257,6 +347,7 @@ async function runStreamLoop(): Promise<void> {
     if (context) {
       await context.close().catch(() => {});
       context = null;
+      page = null;
     }
   }
 
@@ -269,7 +360,16 @@ async function runStreamLoop(): Promise<void> {
       streamConfig.height,
     );
     context = launched.context;
+    page = launched.page;
     ffmpeg = spawnFfmpeg(streamConfig, display, rtmpUrl);
+
+    startAudioHealthMonitor(
+      () => page,
+      dashboardUrl,
+      () => {
+        if (!restarting) void restart("silent audio");
+      },
+    );
 
     ffmpeg.on("exit", (code, signal) => {
       console.warn(`[stream] ffmpeg exited (code=${code}, signal=${signal})`);
