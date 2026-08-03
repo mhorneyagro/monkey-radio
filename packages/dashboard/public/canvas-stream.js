@@ -86,6 +86,42 @@ playback.startTicking();
 await refreshNowPlaying();
 setInterval(refreshNowPlaying, 500);
 
+async function keepAudioAlive() {
+  try {
+    await playback.resume();
+    unmuteAudioElements();
+    playback.setVolume(1);
+
+    const response = await fetch("/api/broadcast/now-playing?audioOrigin=local");
+    const data = await response.json();
+    if (!data.playing) return;
+
+    const { audioContext } = playback.getAudioHook();
+    const primary = playback.getPrimaryAudio();
+    const stalled =
+      primary.paused ||
+      primary.ended ||
+      audioContext.state === "suspended" ||
+      !playback.isPlaying();
+
+    if (!stalled) return;
+
+    console.warn("[stream] audio stalled — recovering playback");
+    await playback.applyNowPlaying(data);
+    try {
+      await primary.play();
+      window.__STREAM_READY__ = true;
+    } catch (error) {
+      console.warn("[stream] keepalive play failed", error);
+    }
+  } catch (error) {
+    console.warn("[stream] keepalive failed", error);
+  }
+}
+
+// Chromium can suspend Web Audio after long runtime; recover without a full redeploy.
+setInterval(() => void keepAudioAlive(), 15_000);
+
 // Retry autoplay until stream worker sees __STREAM_READY__
 const readyInterval = setInterval(async () => {
   if (window.__STREAM_READY__) {
