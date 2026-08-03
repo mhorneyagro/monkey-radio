@@ -14,6 +14,11 @@ export class ChatBuffer {
     this.prune();
   }
 
+  replace(messages: ChatMessage[]): void {
+    this.messages = [...messages];
+    this.prune();
+  }
+
   getRecent(windowMs = this.windowMs): ChatMessage[] {
     this.prune(windowMs);
     return [...this.messages];

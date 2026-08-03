@@ -5,6 +5,10 @@ import {
   type MonkeyRadioDb,
 } from "@monkey-radio/shared";
 import type { ChatBuffer } from "./buffer.js";
+import {
+  parseChatIgnoreUsernames,
+  shouldIncludeChatForDj,
+} from "./filter.js";
 
 export const MOCK_CHAT_MESSAGES = [
   { username: "nightowl_42", message: "this lofi vibe is perfect for studying" },
@@ -21,10 +25,22 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function syncChatFromDb(db: MonkeyRadioDb, buffer: ChatBuffer, limit = 100): void {
-  buffer.add(
-    getRecentChatMessages(db, limit, { excludeSources: ["mock"] }),
-  );
+function djChatFilterOptions(config: BroadcastWorkerConfig) {
+  return {
+    ignoreUsernames: parseChatIgnoreUsernames(config.chatIgnoreUsernames),
+  };
+}
+
+function syncChatFromDb(
+  db: MonkeyRadioDb,
+  buffer: ChatBuffer,
+  config: BroadcastWorkerConfig,
+  limit = 100,
+): void {
+  const filterOptions = djChatFilterOptions(config);
+  const messages = getRecentChatMessages(db, limit, { excludeSources: ["mock"] })
+    .filter((message) => shouldIncludeChatForDj(message, filterOptions));
+  buffer.replace(messages);
 }
 
 export function startChatPoller(
@@ -39,6 +55,7 @@ export function startChatPoller(
   let stopped = false;
   let pageToken: string | undefined;
   let liveChatId: string | undefined;
+  const filterOptions = djChatFilterOptions(config);
 
   async function pollOnce(): Promise<void> {
     if (stopped) return;
@@ -64,6 +81,15 @@ export function startChatPoller(
       pageToken = result.nextPageToken;
 
       for (const message of result.messages) {
+        if (
+          !shouldIncludeChatForDj(message, {
+            ...filterOptions,
+            isChatOwner: message.isChatOwner,
+          })
+        ) {
+          continue;
+        }
+
         insertChatMessage(db, {
           id: message.id,
           username: message.username,
@@ -74,7 +100,7 @@ export function startChatPoller(
       }
     }
 
-    syncChatFromDb(db, buffer);
+    syncChatFromDb(db, buffer, config);
   }
 
   void (async () => {
@@ -129,6 +155,7 @@ async function fetchYouTubeChat(
     username: string;
     message: string;
     timestamp: string;
+    isChatOwner: boolean;
   }>;
   nextPageToken?: string;
 }> {
@@ -148,7 +175,7 @@ async function fetchYouTubeChat(
     items?: Array<{
       id: string;
       snippet?: { displayMessage?: string; publishedAt?: string };
-      authorDetails?: { displayName?: string };
+      authorDetails?: { displayName?: string; isChatOwner?: boolean };
     }>;
   };
 
@@ -158,6 +185,7 @@ async function fetchYouTubeChat(
       username: item.authorDetails?.displayName ?? "viewer",
       message: item.snippet?.displayMessage ?? "",
       timestamp: item.snippet?.publishedAt ?? new Date().toISOString(),
+      isChatOwner: item.authorDetails?.isChatOwner === true,
     })) ?? [];
 
   return { messages, nextPageToken: data.nextPageToken };
